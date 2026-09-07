@@ -1,0 +1,43 @@
+name: Build image
+on: [push]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io/${{ github.repository_owner }}
+  IMAGE: ${{ github.event.repository.name }}
+
+jobs:
+  build:
+    name: Build image
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image
+        uses: redhat-actions/buildah-build@v3
+        with:
+          image: ${{ env.IMAGE }}
+          tags: |
+            latest
+            ${{ github.run_number }}
+          build-args: |
+            IMAGE_REVISION=${{ github.sha }}
+            IMAGE_BUILD=${{ github.run_number }}
+          containerfiles: |
+            ./Containerfile
+
+      - name: Push image
+        uses: redhat-actions/push-to-registry@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          registry: ${{ env.REGISTRY }}
+          image: ${{ env.IMAGE }}
+          tags: |
+            latest
+            ${{ github.run_number }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}

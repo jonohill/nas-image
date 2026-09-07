@@ -1,0 +1,15 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":dependencyDashboard"],
+  "timezone": "Pacific/Auckland",
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "linuxserver.io images use date-style tags, not semver",
+      "matchPackageNames": ["lscr.io/linuxserver/**"],
+      "versioning": "loose"
+    }
+  ],
+  "automerge": true,
+  "platformAutomerge": false
+}

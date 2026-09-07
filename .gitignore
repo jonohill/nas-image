@@ -1,0 +1,7 @@
+.DS_Store
+/output/
+*.qcow2
+*.raw
+secrets/
+.env*
+*.age

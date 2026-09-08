@@ -6,3 +6,4 @@ secrets/
 .env*
 *.age
 docs/
+host.pub

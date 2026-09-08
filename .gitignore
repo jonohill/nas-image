@@ -7,3 +7,4 @@ secrets/
 *.age
 docs/
 host.pub
+CLAUDE.md

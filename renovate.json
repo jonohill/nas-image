@@ -10,6 +10,16 @@
       "versioning": "loose"
     }
   ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "OpenZFS release pinned as ARG ZFS_VERSION in the Containerfile",
+      "managerFilePatterns": ["/^Containerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) extractVersion=(?<extractVersion>\\S+)\\s+ARG ZFS_VERSION=(?<currentValue>\\S+)"
+      ]
+    }
+  ],
   "automerge": true,
   "platformAutomerge": false
 }

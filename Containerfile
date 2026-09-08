@@ -69,12 +69,15 @@ RUN dnf install -y tuned powertop && dnf clean all && \
     systemctl enable tuned.service
 
 # ZFS, see docs/zfs.md. Root is not on ZFS, so zfs-dracut is left out and the
-# shipped initramfs stays as is.
+# shipped initramfs stays as is. sysstat is a hard dependency of the zfs
+# package; its 10-minute collector timer is disabled to keep the box idle.
 COPY --from=zfs-builder /rpms /tmp/zfs-rpms
 RUN dnf install -y /tmp/zfs-rpms/*.rpm && dnf clean all && rm -rf /tmp/zfs-rpms && \
     depmod -a "$(ls /usr/lib/modules)" && \
     systemctl enable zfs-hostid.service zfs-import-scan.service zfs-import.target \
-        zfs-mount.service zfs-zed.service zfs.target
+        zfs-mount.service zfs-zed.service zfs.target && \
+    systemctl disable sysstat.service sysstat-collect.timer sysstat-rotate.timer \
+        sysstat-summary.timer
 
 # Logically bound images: quadlet images are pulled with the host image.
 RUN mkdir -p /usr/lib/bootc/bound-images.d && \

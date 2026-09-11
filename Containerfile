@@ -1,6 +1,6 @@
 # The i5-3570K (Ivy Bridge) has no AVX2, so it needs AlmaLinux's x86_64_v2
 # build. The :10 index carries it as the linux/amd64/v2 platform.
-FROM --platform=linux/amd64/v2 quay.io/almalinuxorg/almalinux-bootc:10
+FROM --platform=linux/amd64/v2 quay.io/almalinuxorg/almalinux-bootc:10.2
 
 COPY root/ /
 

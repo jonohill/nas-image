@@ -1,6 +1,6 @@
 # The i5-3570K (Ivy Bridge) has no AVX2, so it needs AlmaLinux's x86_64_v2
 # build. The :10 index carries it as the linux/amd64/v2 platform.
-FROM --platform=linux/amd64/v2 quay.io/almalinuxorg/almalinux-bootc:10 AS base
+FROM --platform=linux/amd64/v2 quay.io/almalinuxorg/almalinux-bootc:10.2 AS base
 
 # OpenZFS is built from source against this image's kernel. The prebuilt
 # kmod-zfs packages target stock EL10, whose toolchain emits x86-64-v3

@@ -17,6 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Write module signing key
+        run: printf '%s\n' "$MOK_SIGNING_KEY" > "$RUNNER_TEMP/mok.key"
+        env:
+          MOK_SIGNING_KEY: ${{ secrets.MOK_SIGNING_KEY }}
+
       - name: Build image
         uses: redhat-actions/buildah-build@v3
         with:
@@ -29,6 +34,8 @@ jobs:
             IMAGE_BUILD=${{ github.run_number }}
           containerfiles: |
             ./Containerfile
+          extra-args: |
+            --secret id=mok_key,src=${{ runner.temp }}/mok.key
 
       - name: Push image
         uses: redhat-actions/push-to-registry@v3

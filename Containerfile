@@ -79,6 +79,14 @@ RUN dnf install -y /tmp/zfs-rpms/*.rpm && dnf clean all && rm -rf /tmp/zfs-rpms 
     systemctl disable sysstat.service sysstat-collect.timer sysstat-rotate.timer \
         sysstat-summary.timer
 
+# The NAS boots with Secure Boot on, so the kernel refuses unsigned modules.
+COPY --from=zfs-builder /usr/src/kernels/*/scripts/sign-file /tmp/sign-file
+RUN --mount=type=secret,id=mok_key,required=true \
+    for ko in /usr/lib/modules/*/extra/*/*.ko; do \
+        /tmp/sign-file sha256 /run/secrets/mok_key /etc/pki/mok/nas-image.der "$ko" && \
+        modinfo -F signer "$ko" | grep -q . || exit 1; \
+    done && rm /tmp/sign-file
+
 # Logically bound images: quadlet images are pulled with the host image.
 RUN mkdir -p /usr/lib/bootc/bound-images.d && \
     find /usr/share/containers/systemd \

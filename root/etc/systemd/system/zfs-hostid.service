@@ -1,0 +1,14 @@
+[Unit]
+Description=Generate a persistent /etc/hostid for ZFS
+ConditionPathExists=!/etc/hostid
+# Default dependencies would order this after sysinit.target, which the
+# zfs-mount -> local-fs.target chain sits before, creating a cycle.
+DefaultDependencies=no
+Before=systemd-modules-load.service zfs-import-scan.service zfs-import-cache.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/zgenhostid
+
+[Install]
+WantedBy=zfs-import.target

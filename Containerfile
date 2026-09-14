@@ -41,6 +41,7 @@ RUN dnf install -y epel-release && \
         htop \
         git \
         jq \
+        smartmontools \
         tar \
     && dnf clean all
 
@@ -75,7 +76,8 @@ COPY --from=zfs-builder /rpms /tmp/zfs-rpms
 RUN dnf install -y /tmp/zfs-rpms/*.rpm && dnf clean all && rm -rf /tmp/zfs-rpms && \
     depmod -a "$(ls /usr/lib/modules)" && \
     systemctl enable zfs-hostid.service zfs-import-scan.service zfs-import.target \
-        zfs-mount.service zfs-zed.service zfs.target && \
+        zfs-mount.service zfs-zed.service zfs.target zfs-tank.service && \
+    systemctl add-wants offpeak.target zfs-scrub@tank.service && \
     systemctl disable sysstat.service sysstat-collect.timer sysstat-rotate.timer \
         sysstat-summary.timer
 
@@ -95,6 +97,9 @@ RUN mkdir -p /usr/lib/bootc/bound-images.d && \
 
 # daily updates, reboot if needed (schedule in the timer drop-in)
 RUN systemctl enable bootc-fetch-apply-updates.timer
+
+# Off-peak power window, see docs/offpeak.md.
+RUN systemctl enable offpeak-start.timer offpeak-stop.timer
 
 RUN dnf install -y greenboot && dnf clean all && \
     chmod 0755 /etc/greenboot/check/required.d/*.sh && \

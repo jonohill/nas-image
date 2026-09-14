@@ -1,0 +1,6 @@
+[Unit]
+Description=Off-peak power window
+
+# Active while power is free. offpeak-start.timer and offpeak-stop.timer hold
+# the hours. Tasks attach with WantedBy=offpeak.target (start when the window
+# opens) and PartOf=offpeak.target (also stop when it closes).

@@ -1,0 +1,8 @@
+[Unit]
+Description=Close the off-peak power window
+
+[Timer]
+OnCalendar=Mon..Fri 23:59 Pacific/Auckland
+
+[Install]
+WantedBy=timers.target

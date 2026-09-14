@@ -1,0 +1,11 @@
+[Unit]
+Description=Open the off-peak power window
+
+[Timer]
+OnCalendar=Mon..Fri 21:00 Pacific/Auckland
+Unit=offpeak.target
+# Not Persistent: a boot after the window would otherwise fire the missed
+# start and stop timers together in unspecified order.
+
+[Install]
+WantedBy=timers.target

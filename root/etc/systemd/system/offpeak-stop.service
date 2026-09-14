@@ -1,0 +1,6 @@
+[Unit]
+Description=Close the off-peak power window
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl stop offpeak.target

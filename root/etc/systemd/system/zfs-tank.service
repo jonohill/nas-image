@@ -1,0 +1,15 @@
+[Unit]
+Description=Import, unlock and mount the tank pool
+After=download-secrets.service zfs-import.target
+Wants=download-secrets.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=-/usr/sbin/zpool import -N tank
+ExecStart=/usr/sbin/zfs load-key -r tank
+ExecStart=/usr/sbin/zfs mount -a
+ExecStartPost=/usr/bin/mountpoint -q /var/mnt/tank
+
+[Install]
+WantedBy=multi-user.target

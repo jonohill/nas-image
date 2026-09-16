@@ -10,7 +10,7 @@ Wants=download-secrets.service
 Type=oneshot
 RemainAfterExit=yes
 ExecStartPre=-/usr/sbin/zpool import -N -d /dev/disk/by-id/dm-name-almalinux-ssd ssd
-ExecStart=/usr/sbin/zfs load-key -r ssd
+ExecStart=-/usr/sbin/zfs load-key ssd
 ExecStart=/usr/sbin/zfs mount -a
 ExecStartPost=/usr/bin/mountpoint -q /var/mnt/ssd/data
 

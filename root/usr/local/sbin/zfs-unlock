@@ -1,0 +1,43 @@
+#!/bin/bash
+# Unlock (or re-lock) an encrypted ZFS dataset on demand.
+#
+# Usage:
+#   zfs-unlock <dataset>          load key (passphrase prompt) and mount
+#   zfs-unlock <dataset> --lock   unmount and unload the key
+#
+# Designed for a dataset created with `zfs create -o encryption=on
+# -o keyformat=passphrase -o keylocation=prompt tank/private` that must NOT
+# be auto-unlocked at boot — i.e. keep it out of any `zfs load-key -r pool`
+# run by boot units (or use `zfs load-key -n tank/private` exclusion logic).
+#
+# The passphrase prompt reads from the controlling terminal, so this works
+# over SSH or at the physical console.
+
+set -euo pipefail
+
+usage() {
+    echo "usage: ${0##*/} <dataset> [--lock]" >&2
+    exit 2
+}
+
+[ $# -ge 1 ] || usage
+dataset=$1
+action=${2:-unlock}
+
+case "$action" in
+    --lock)
+        # Unmount descendants first, then the dataset, then drop the key so
+        # the data becomes unreadable again until the next explicit unlock.
+        zfs unmount -A "$dataset"
+        zfs unload-key -r "$dataset"
+        ;;
+    unlock)
+        # No-op if already loaded; prompt for the passphrase otherwise.
+        zfs load-key -r "$dataset"
+        # -a alone would try to mount everything; scope it to this subtree.
+        zfs mount -l "$dataset" 2>/dev/null || zfs mount "$dataset"
+        ;;
+    *)
+        usage
+        ;;
+esac

@@ -1,0 +1,17 @@
+[Unit]
+Description=Unlock %i dataset on demand (passphrase prompt)
+# Not part of the boot chain: this is for an operator to unlock manually,
+# e.g. `sudo zfs-unlock tank/private` or `systemctl start zfs-unlock@tank-private`.
+# The passphrase is read from the controlling terminal (console or SSH).
+# Daily scrubbing is unaffected: scrubs work on locked pools.
+After=zfs-tank.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# %i uses dashes in place of slashes; translate back for zfs.
+ExecStart=/bin/sh -c 'set -eu; dataset=$(systemd-escape --unescape %i); /usr/local/sbin/zfs-unlock "$dataset"'
+ExecStop=/bin/sh -c 'set -eu; dataset=$(systemd-escape --unescape %i); /usr/local/sbin/zfs-unlock "$dataset" --lock'
+
+[Install]
+WantedBy=multi-user.target

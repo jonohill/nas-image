@@ -7,7 +7,8 @@ Wants=download-secrets.service
 Type=oneshot
 RemainAfterExit=yes
 ExecStartPre=-/usr/sbin/zpool import -N tank
-ExecStart=/usr/sbin/zfs load-key -r tank
+ExecStart=/usr/sbin/zfs load-key tank
+ExecStart=/usr/sbin/zfs load-key tank/data
 ExecStart=/usr/sbin/zfs mount -a
 ExecStartPost=/usr/bin/mountpoint -q /var/mnt/tank
 

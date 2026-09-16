@@ -76,8 +76,8 @@ COPY --from=zfs-builder /rpms /tmp/zfs-rpms
 RUN dnf install -y /tmp/zfs-rpms/*.rpm && dnf clean all && rm -rf /tmp/zfs-rpms && \
     depmod -a "$(ls /usr/lib/modules)" && \
     systemctl enable zfs-hostid.service zfs-import-scan.service zfs-import.target \
-        zfs-mount.service zfs-zed.service zfs.target zfs-tank.service && \
-    systemctl add-wants offpeak.target zfs-scrub@tank.service && \
+        zfs-mount.service zfs-zed.service zfs.target zfs-tank.service zfs-ssd.service && \
+    systemctl add-wants offpeak.target zfs-scrub@tank.service zfs-scrub@ssd.service && \
     systemctl disable sysstat.service sysstat-collect.timer sysstat-rotate.timer \
         sysstat-summary.timer
 

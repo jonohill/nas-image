@@ -1,0 +1,18 @@
+[Unit]
+Description=Import, unlock and mount the ssd pool
+# The initramfs activates only the root and swap LVs, so the pool's LV
+# appears after udev activates the rest of the VG in the real root.
+Requires=dev-almalinux-ssd.device
+After=dev-almalinux-ssd.device download-secrets.service zfs-import.target
+Wants=download-secrets.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=-/usr/sbin/zpool import -N -d /dev/disk/by-id/dm-name-almalinux-ssd ssd
+ExecStart=/usr/sbin/zfs load-key -r ssd
+ExecStart=/usr/sbin/zfs mount -a
+ExecStartPost=/usr/bin/mountpoint -q /var/mnt/ssd/data
+
+[Install]
+WantedBy=multi-user.target

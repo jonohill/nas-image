@@ -1,0 +1,14 @@
+[Unit]
+Description=Install Homebrew into /home/linuxbrew (one-time bootstrap)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=!/home/linuxbrew/.linuxbrew/bin/brew
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+# Leading "-": don't fail greenboot
+ExecStart=-/usr/local/sbin/install-homebrew.sh
+
+[Install]
+WantedBy=multi-user.target

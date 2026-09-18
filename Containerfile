@@ -62,6 +62,10 @@ RUN mkdir -p /etc/bootc-secrets && \
 RUN dnf install -y tailscale && dnf clean all && \
     systemctl enable tailscaled.service tailscale-up.service
 
+RUN dnf install -y gcc gcc-c++ make && dnf clean all && \
+    chmod 0755 /usr/local/sbin/install-homebrew.sh && \
+    systemctl enable install-homebrew.service
+
 # Power tuning, see docs/power-tuning.md. tuned-adm needs the daemon, so the
 # active profile is written directly.
 RUN dnf install -y tuned powertop && dnf clean all && \

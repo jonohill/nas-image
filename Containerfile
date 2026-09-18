@@ -41,6 +41,7 @@ RUN dnf install -y epel-release && \
         htop \
         git \
         jq \
+        podman-compose \
         smartmontools \
         tar \
     && dnf clean all

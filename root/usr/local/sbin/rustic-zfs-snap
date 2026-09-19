@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Create or destroy the short-lived <dataset>@rustic snapshot that a backup
+# profile reads from. Used by the run-before and run-finally hooks.
+set -euo pipefail
+
+zfs=/usr/sbin/zfs
+
+usage() {
+    echo "usage: rustic-zfs-snap create|destroy <dataset>" >&2
+    exit 2
+}
+
+[ $# -eq 2 ] || usage
+
+action=$1
+snap="$2@rustic"
+
+snap_exists() {
+    "$zfs" list -H -t snapshot -o name "$snap" >/dev/null 2>&1
+}
+
+case "$action" in
+    create)
+        if snap_exists; then
+            "$zfs" destroy "$snap"
+        fi
+        "$zfs" snapshot "$snap"
+        ;;
+    destroy)
+        if snap_exists; then
+            "$zfs" destroy "$snap"
+        fi
+        ;;
+    *)
+        usage
+        ;;
+esac

@@ -1,0 +1,16 @@
+[global]
+no-progress = true
+
+[repository]
+repository = "/var/mnt/tank/backup/rustic"
+password-file = "/run/rustic/password"
+# A cache of a local repo only duplicates its tree packs onto the root disk.
+no-cache = true
+
+[forget]
+keep-daily = 30
+keep-weekly = 8
+keep-monthly = 12
+
+[copy]
+targets = ["jotta"]

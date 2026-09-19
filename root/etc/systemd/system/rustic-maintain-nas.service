@@ -1,0 +1,13 @@
+[Unit]
+Description=Forget, prune and check the NAS rustic repo
+Requires=zfs-tank.service download-secrets.service
+After=zfs-tank.service download-secrets.service
+
+[Service]
+Type=oneshot
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+Environment=TZ=Pacific/Auckland
+EnvironmentFile=/run/rustic/env
+ExecCondition=/usr/local/sbin/rustic-due nas-maintain-nas 6
+ExecCondition=/usr/local/sbin/rustic-idle nas-ssd-data
+ExecStart=/usr/local/sbin/rustic-job nas-maintain-nas /usr/local/sbin/rustic-maintain-nas

@@ -1,0 +1,13 @@
+[global]
+use-profiles = ["jotta"]
+
+[[backup.snapshots]]
+sources = ["/var/mnt/tank/data/.zfs/snapshot/rustic"]
+as-path = "/var/mnt/tank/data"
+label = "tank-data"
+custom-ignorefiles = [".rusticignore"]
+exclude-if-present = [".nobackup"]
+
+[backup.snapshots.hooks]
+run-before = ["/usr/local/sbin/rustic-zfs-snap create tank/data"]
+run-finally = ["/usr/local/sbin/rustic-zfs-snap destroy tank/data"]

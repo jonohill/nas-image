@@ -1,0 +1,21 @@
+[Unit]
+Description=Append-only REST endpoint for the NAS rustic repo
+Requires=zfs-tank.service download-secrets.service
+After=zfs-tank.service download-secrets.service network-online.target
+Wants=network-online.target
+# Inactive rather than failing until the repo is seeded.
+ConditionPathExists=/var/mnt/tank/backup/rustic/config
+# A failed unit at boot triggers a greenboot rollback. A restart loop instead
+# surfaces as the mac backup check going quiet.
+StartLimitIntervalSec=0
+
+[Service]
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+Environment=TZ=Pacific/Auckland
+EnvironmentFile=/run/rustic/env
+ExecStart=/usr/bin/rclone serve restic --append-only --addr :8000 /var/mnt/tank/backup/rustic
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

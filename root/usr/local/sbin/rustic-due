@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# ExecCondition= helper: succeed when a job is due.
+#
+#   rustic-due <job-name> <min-days>
+#
+# Due means no last-success stamp from rustic-job, or one older than min-days.
+set -euo pipefail
+
+if [ $# -ne 2 ]; then
+    echo "usage: rustic-due <job-name> <min-days>" >&2
+    exit 2
+fi
+
+stamp="/var/lib/rustic/last-success/$1"
+min_days=$2
+
+[ -e "$stamp" ] || exit 0
+
+age_days=$(( ( $(date +%s) - $(stat -c %Y "$stamp") ) / 86400 ))
+[ "$age_days" -ge "$min_days" ]

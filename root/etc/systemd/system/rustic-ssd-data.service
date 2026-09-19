@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up ssd/data to the NAS rustic repo
+Requires=zfs-ssd.service zfs-tank.service download-secrets.service
+After=zfs-ssd.service zfs-tank.service download-secrets.service
+
+[Service]
+Type=oneshot
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+Environment=TZ=Pacific/Auckland
+EnvironmentFile=/run/rustic/env
+ExecStart=/usr/local/sbin/rustic-job nas-ssd-data /usr/local/bin/rustic -P ssd-data backup

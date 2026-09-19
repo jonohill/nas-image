@@ -1,0 +1,8 @@
+[Unit]
+Description=Daily ssd/data backup
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 Pacific/Auckland
+
+[Install]
+WantedBy=timers.target

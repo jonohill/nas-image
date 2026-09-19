@@ -1,0 +1,20 @@
+[global]
+no-progress = true
+
+[repository]
+repository = "rclone:jotta-raw:backup/rustic"
+password-file = "/run/rustic/password"
+cache-dir = "/var/cache/rustic"
+
+[repository.options]
+# The timetable is upload-only and read in the process's local time. The units
+# set TZ=Pacific/Auckland because the NAS clock is UTC.
+rclone-command = 'rclone serve restic --addr localhost:0 --config /var/lib/rustic/rclone.conf --bwlimit "08:00,2M:off 22:00,off"'
+retry = "default"
+timeout = "5min"
+
+[forget]
+keep-daily = 30
+keep-weekly = 4
+keep-monthly = 12
+keep-yearly = 2

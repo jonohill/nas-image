@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily jotta backup and copy
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Pacific/Auckland
+# Resume a run that a reboot interrupted.
+OnBootSec=10min
+
+[Install]
+WantedBy=timers.target

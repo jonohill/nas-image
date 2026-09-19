@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# ExecCondition= helper: succeed when none of the given jobs is running or
+# was interrupted.
+#
+#   rustic-idle <job-name>...
+#
+# A job counts as outstanding while its last-start stamp from rustic-job is
+# newer than its last-success stamp. Packs written by an unfinished backup
+# are referenced by no snapshot, and a prune would mark them for deletion.
+set -euo pipefail
+
+[ $# -ge 1 ] || { echo "usage: rustic-idle <job-name>..." >&2; exit 2; }
+
+for job in "$@"; do
+    start="/var/lib/rustic/last-start/$job"
+    success="/var/lib/rustic/last-success/$job"
+    [ -e "$start" ] || continue
+    if [ ! -e "$success" ] || [ "$start" -nt "$success" ]; then
+        echo "rustic-idle: $job outstanding" >&2
+        exit 1
+    fi
+done

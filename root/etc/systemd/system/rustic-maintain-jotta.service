@@ -1,0 +1,13 @@
+[Unit]
+Description=Forget, prune and check the jotta rustic repo
+Requires=zfs-tank.service download-secrets.service
+After=zfs-tank.service download-secrets.service
+
+[Service]
+Type=oneshot
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+Environment=TZ=Pacific/Auckland
+EnvironmentFile=/run/rustic/env
+ExecCondition=/usr/local/sbin/rustic-due nas-maintain-jotta 27
+ExecCondition=/usr/local/sbin/rustic-idle nas-tank-data nas-copy
+ExecStart=/usr/local/sbin/rustic-job nas-maintain-jotta /usr/local/sbin/rustic-maintain-jotta

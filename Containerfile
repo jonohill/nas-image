@@ -111,6 +111,11 @@ RUN cd /tmp && \
     dnf install -y "https://github.com/rclone/rclone/releases/download/v${RCLONE_RELEASE}/rclone-v${RCLONE_RELEASE}-linux-amd64.rpm" && \
     dnf clean all
 
+RUN chmod 0755 /usr/local/sbin/rustic-zfs-snap /usr/local/sbin/rustic-job \
+        /usr/local/sbin/rustic-due /usr/local/sbin/rustic-idle \
+        /usr/local/sbin/rustic-maintain-nas /usr/local/sbin/rustic-maintain-jotta && \
+    systemctl enable rustic-serve.service
+
 # Logically bound images: quadlet images are pulled with the host image.
 RUN mkdir -p /usr/lib/bootc/bound-images.d && \
     find /usr/share/containers/systemd \

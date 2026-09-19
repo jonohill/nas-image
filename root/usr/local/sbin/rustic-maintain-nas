@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Weekly maintenance of the NAS repo: snapshot the repo dataset as insurance,
+# forget and prune, then check a rotating quarter of the pack data.
+set -euo pipefail
+
+zfs=/usr/sbin/zfs
+rustic=/usr/local/bin/rustic
+
+snap="tank/backup@pre-prune-$(date +%F)"
+"$zfs" list -H -t snapshot -o name "$snap" >/dev/null 2>&1 || "$zfs" snapshot "$snap"
+"$zfs" list -H -t snapshot -o name -s creation -d 1 tank/backup |
+    grep '@pre-prune-' |
+    head -n -2 |
+    while read -r snap; do
+        "$zfs" destroy "$snap"
+    done
+
+"$rustic" -P nas forget --prune --keep-delete 7d
+
+week=$(date +%V)
+"$rustic" -P nas check --read-data-subset "$(( 10#$week % 4 + 1 ))/4"

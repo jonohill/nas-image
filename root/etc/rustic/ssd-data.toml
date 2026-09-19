@@ -1,0 +1,13 @@
+[global]
+use-profiles = ["nas"]
+
+[[backup.snapshots]]
+sources = ["/var/mnt/ssd/data/.zfs/snapshot/rustic"]
+as-path = "/var/mnt/ssd/data"
+label = "ssd-data"
+custom-ignorefiles = [".rusticignore"]
+exclude-if-present = [".nobackup"]
+
+[backup.snapshots.hooks]
+run-before = ["/usr/local/sbin/rustic-zfs-snap create ssd/data"]
+run-finally = ["/usr/local/sbin/rustic-zfs-snap destroy ssd/data"]

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Monthly maintenance of the jotta repo: forget and prune with a repack cap,
+# then check a rotating twelfth of the pack data.
+set -euo pipefail
+
+rustic=/usr/local/bin/rustic
+
+"$rustic" -P jotta forget --prune --max-repack 2GiB --max-unused 10% --keep-delete 7d
+
+month=$(date +%m)
+"$rustic" -P jotta check --read-data-subset "$(( 10#$month ))/12"

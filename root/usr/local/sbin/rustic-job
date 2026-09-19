@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Run one backup job and report it to healthchecks.
+#
+#   rustic-job <job-name> <command...>
+#
+# Pings HC_URL_<JOB_NAME> (upper case, dashes to underscores) on start,
+# success and failure, with the tail of the output as the body. Touches
+# /var/lib/rustic/last-start/<job-name> at start and last-success/<job-name>
+# on success, for rustic-due and rustic-idle.
+#
+# Always exits 0: a failed unit at boot triggers a greenboot rollback, so
+# failures are reported through healthchecks instead.
+set -uo pipefail
+
+if [ $# -lt 2 ]; then
+    echo "usage: rustic-job <job-name> <command...>" >&2
+    exit 0
+fi
+
+job=$1
+shift
+
+url_var="HC_URL_$(echo "$job" | tr 'a-z-' 'A-Z_')"
+url=${!url_var:-}
+
+output=$(mktemp)
+body=$(mktemp)
+trap 'rm -f "$output" "$body"' EXIT
+
+ping() {
+    [ -n "$url" ] || return 0
+    curl -fsS -m 10 --retry 3 -o /dev/null "$@" || true
+}
+
+mkdir -p /var/lib/rustic/last-start /var/lib/rustic/last-success
+touch "/var/lib/rustic/last-start/$job"
+ping "$url/start"
+
+"$@" 2>&1 | tee "$output"
+rc=${PIPESTATUS[0]}
+
+tail -c 10240 "$output" > "$body"
+
+if [ "$rc" -eq 0 ]; then
+    touch "/var/lib/rustic/last-success/$job"
+    ping --data-binary "@$body" "$url"
+else
+    echo "rustic-job: $job failed (exit $rc)" >&2
+    ping --data-binary "@$body" "$url/fail"
+fi
+
+exit 0

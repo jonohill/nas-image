@@ -13,10 +13,10 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "OpenZFS release pinned as ARG ZFS_VERSION in the Containerfile",
+      "description": "Release versions pinned as ARG in the Containerfile",
       "managerFilePatterns": ["/^Containerfile$/"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) extractVersion=(?<extractVersion>\\S+)\\s+ARG ZFS_VERSION=(?<currentValue>\\S+)"
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) extractVersion=(?<extractVersion>\\S+)\\s+ARG \\w+=(?<currentValue>\\S+)"
       ]
     }
   ],

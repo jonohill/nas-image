@@ -1,0 +1,9 @@
+[Unit]
+Description=Swap on the boot SSD LV
+
+[Swap]
+What=/dev/almalinux/swap
+Options=discard
+
+[Install]
+WantedBy=swap.target

@@ -128,6 +128,8 @@ RUN systemctl enable bootc-fetch-apply-updates.timer
 # Off-peak power window, see docs/offpeak.md.
 RUN systemctl enable offpeak-start.timer offpeak-stop.timer
 
+RUN systemctl enable dev-almalinux-swap.swap
+
 RUN dnf install -y greenboot && dnf clean all && \
     chmod 0755 /etc/greenboot/check/required.d/*.sh && \
     systemctl enable greenboot-healthcheck.service

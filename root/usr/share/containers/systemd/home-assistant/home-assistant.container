@@ -1,0 +1,29 @@
+[Unit]
+Description=Home Assistant
+Requires=zfs-ssd.service
+After=zfs-ssd.service network-online.target
+Wants=network-online.target
+# A failed unit at boot triggers a greenboot rollback, so keep restarting
+# rather than parking the unit as failed.
+StartLimitIntervalSec=0
+
+[Container]
+Image=ghcr.io/home-assistant/home-assistant:2026.9.3
+GlobalArgs=--storage-opt=additionalimagestore=/usr/lib/bootc/storage
+# Image is logically bound, so bootc keeps it in the additional store above
+Pull=never
+ContainerName=home-assistant
+# Host networking for mDNS, SSDP and other LAN discovery. The UI is on 8123.
+Network=host
+Environment=TZ=Pacific/Auckland
+Volume=/var/mnt/ssd/data/home-assistant:/config:Z
+
+[Service]
+Restart=always
+RestartSec=30
+# Home Assistant only writes its default configuration.yaml when none exists,
+# so the proxy settings have to be seeded before the first start.
+ExecStartPre=/usr/bin/sh -c 'd=/var/mnt/ssd/data/home-assistant; mkdir -p "$$d"; [ -e "$$d/configuration.yaml" ] || cp /usr/share/containers/systemd/home-assistant/configuration.yaml "$$d/"; for f in automations scripts scenes; do [ -e "$$d/$$f.yaml" ] || : > "$$d/$$f.yaml"; done'
+
+[Install]
+WantedBy=multi-user.target

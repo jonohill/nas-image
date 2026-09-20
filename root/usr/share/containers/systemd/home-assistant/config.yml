@@ -1,0 +1,9 @@
+credentials-file: /etc/cloudflared/credentials.json
+ingress:
+  - hostname: ha.jonohill.nz
+    service: http://localhost:8123
+    originRequest:
+      access: *cf_access
+
+  # Required final catch-all.
+  - service: http_status:404

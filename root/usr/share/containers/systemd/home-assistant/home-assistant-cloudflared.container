@@ -1,0 +1,31 @@
+[Unit]
+Description=Home Assistant cloudflared tunnel
+After=download-secrets.service
+Requires=download-secrets.service
+# A failed unit at boot triggers a greenboot rollback, so keep restarting
+# rather than parking the unit as failed.
+StartLimitIntervalSec=0
+
+[Container]
+Image=docker.io/cloudflare/cloudflared:2026.9.1
+GlobalArgs=--storage-opt=additionalimagestore=/usr/lib/bootc/storage
+# Image is logically bound, so bootc keeps it in the additional store above
+Pull=never
+ContainerName=home-assistant-cloudflared
+# Home Assistant is on the host network, so the origin is localhost.
+Network=host
+Environment=TZ=Pacific/Auckland
+Volume=/run/home-assistant-cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+Volume=/run/home-assistant-cloudflared/credentials.json:/etc/cloudflared/credentials.json:ro
+SecurityLabelDisable=true
+Exec=tunnel run
+
+[Service]
+Restart=always
+RestartSec=30
+EnvironmentFile=/run/home-assistant-cloudflared/env
+ExecStartPre=/usr/bin/sh -c 'cat /run/cloudflared-access/access.yml /run/home-assistant-cloudflared/tunnel.yml /usr/share/containers/systemd/home-assistant/config.yml > /run/home-assistant-cloudflared/config.yml'
+ExecStartPre=/usr/bin/sh -c 'echo "$$TUNNEL_CRED_CONTENTS" > /run/home-assistant-cloudflared/credentials.json'
+
+[Install]
+WantedBy=multi-user.target

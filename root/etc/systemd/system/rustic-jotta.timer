@@ -1,5 +1,5 @@
 [Unit]
-Description=Daily jotta backup and copy
+Description=Daily tank/data backup to jotta
 
 [Timer]
 OnCalendar=*-*-* 03:00:00 Pacific/Auckland

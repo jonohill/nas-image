@@ -11,7 +11,9 @@ cache-dir = "/var/cache/rustic"
 # set TZ=Pacific/Auckland because the NAS clock is UTC.
 rclone-command = 'rclone serve restic --addr localhost:0 --config /var/lib/rustic/rclone.conf --bwlimit "08:00,2M:off 22:00,off"'
 retry = "default"
-timeout = "5min"
+# Per request. A 390 MiB pack takes about 17 minutes at the 0.4 MB/s jotta
+# uploads sustain from here.
+timeout = "60min"
 
 [forget]
 keep-daily = 30

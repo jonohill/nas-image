@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily copy of the NAS rustic repo to jotta
+
+[Timer]
+# After rustic-ssd-data, so the night's snapshot goes out the same night.
+OnCalendar=*-*-* 02:30:00 Pacific/Auckland
+# Resume a run that a reboot interrupted.
+OnBootSec=10min
+
+[Install]
+WantedBy=timers.target

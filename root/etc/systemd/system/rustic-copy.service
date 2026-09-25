@@ -1,5 +1,5 @@
 [Unit]
-Description=Back up tank/data to jotta
+Description=Copy the NAS rustic repo to jotta
 Requires=zfs-tank.service download-secrets.service
 After=zfs-tank.service download-secrets.service network-online.target
 Wants=network-online.target
@@ -9,4 +9,4 @@ Type=oneshot
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
 Environment=TZ=Pacific/Auckland
 EnvironmentFile=/run/rustic/env
-ExecStart=/usr/local/sbin/rustic-job nas-tank-data /usr/local/bin/rustic -P tank-data backup
+ExecStart=/usr/local/sbin/rustic-job nas-copy /usr/local/bin/rustic -P nas copy

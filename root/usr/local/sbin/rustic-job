@@ -6,7 +6,8 @@
 # Pings HC_URL_<JOB_NAME> (upper case, dashes to underscores) on start,
 # success and failure, with the tail of the output as the body. Touches
 # /var/lib/rustic/last-start/<job-name> at start and last-success/<job-name>
-# on success, for rustic-due and rustic-idle.
+# on success, for rustic-due and rustic-idle. A run fails if the command
+# exits non-zero or logs a line starting with [ERROR].
 #
 # Always exits 0: a failed unit at boot triggers a greenboot rollback, so
 # failures are reported through healthchecks instead.
@@ -38,6 +39,12 @@ ping "$url/start"
 
 "$@" 2>&1 | tee "$output"
 rc=${PIPESTATUS[0]}
+
+# rustic copy logs a failed upload to the target as [ERROR] and exits 0.
+if [ "$rc" -eq 0 ] && grep -q '^\[ERROR\]' "$output"; then
+    echo "rustic-job: $job logged [ERROR] despite exit 0" >&2
+    rc=1
+fi
 
 tail -c 10240 "$output" > "$body"
 

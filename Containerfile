@@ -130,6 +130,18 @@ RUN systemctl enable offpeak-start.timer offpeak-stop.timer
 
 RUN systemctl enable dev-almalinux-swap.swap
 
+# Cockpit web console on :9090, see docs/cockpit.md. Weak deps are off to keep
+# out cockpit-packagekit, which cannot update a bootc host.
+RUN dnf install -y --setopt=install_weak_deps=False \
+        cockpit \
+        cockpit-files \
+        cockpit-ostree \
+        cockpit-podman \
+        cockpit-storaged \
+        sscg \
+    && dnf clean all && \
+    systemctl enable cockpit.socket
+
 RUN dnf install -y greenboot && dnf clean all && \
     chmod 0755 /etc/greenboot/check/required.d/*.sh && \
     systemctl enable greenboot-healthcheck.service

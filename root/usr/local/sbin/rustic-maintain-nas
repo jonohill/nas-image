@@ -18,4 +18,4 @@ snap="tank/backup@pre-prune-$(date +%F)"
 "$rustic" -P nas forget --prune --keep-delete 7d
 
 week=$(date +%V)
-"$rustic" -P nas check --read-data-subset "$(( 10#$week % 4 + 1 ))/4"
+"$rustic" -P nas check --read-data --read-data-subset "$(( 10#$week % 4 + 1 ))/4"

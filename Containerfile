@@ -114,7 +114,8 @@ RUN cd /tmp && \
 RUN chmod 0755 /usr/local/sbin/rustic-zfs-snap /usr/local/sbin/rustic-job \
         /usr/local/sbin/rustic-due /usr/local/sbin/rustic-idle \
         /usr/local/sbin/rustic-maintain-nas /usr/local/sbin/rustic-maintain-jotta && \
-    systemctl enable rustic-serve.service rustic-ssd-data.timer rustic-copy.timer && \
+    systemctl enable rustic-serve.service rustic-ssd-data.timer rustic-copy.timer \
+        rustic-jotta.timer && \
     systemctl add-wants offpeak.target rustic-maintain-nas.service rustic-maintain-jotta.service
 
 # Logically bound images: quadlet images are pulled with the host image.

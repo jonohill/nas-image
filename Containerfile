@@ -144,6 +144,12 @@ RUN dnf install -y --setopt=install_weak_deps=False \
     && dnf clean all && \
     systemctl enable cockpit.socket
 
+# Router syslog into the journal, see docs/syslog.md. The image's
+# /etc/rsyslog.conf predates the package, so rpm leaves it and writes .rpmnew.
+RUN dnf install -y rsyslog && dnf clean all && \
+    rm /etc/rsyslog.conf.rpmnew && \
+    systemctl enable rsyslog.service
+
 RUN dnf install -y greenboot && dnf clean all && \
     chmod 0755 /etc/greenboot/check/required.d/*.sh && \
     systemctl enable greenboot-healthcheck.service

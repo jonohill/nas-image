@@ -150,6 +150,12 @@ RUN dnf install -y rsyslog && dnf clean all && \
     rm /etc/rsyslog.conf.rpmnew && \
     systemctl enable rsyslog.service
 
+# Router SNMP metrics, see docs/metrics.md. Grafana starts on the first
+# connection to :3000. The proxy runs from a bin_t copy because the shipped
+# binary's SELinux domain can't bind or connect to 3000-3001 (ntop_port_t).
+RUN install -m 0755 /usr/lib/systemd/systemd-socket-proxyd /usr/local/sbin/grafana-socket-proxyd && \
+    systemctl enable grafana-proxy.socket
+
 RUN dnf install -y greenboot && dnf clean all && \
     chmod 0755 /etc/greenboot/check/required.d/*.sh && \
     systemctl enable greenboot-healthcheck.service

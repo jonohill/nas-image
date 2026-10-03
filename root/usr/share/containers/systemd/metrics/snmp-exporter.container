@@ -1,0 +1,31 @@
+[Unit]
+Description=Prometheus SNMP exporter
+After=download-secrets.service network-online.target
+Requires=download-secrets.service
+Wants=network-online.target
+# A failed unit at boot triggers a greenboot rollback, so keep restarting
+# rather than parking the unit as failed.
+StartLimitIntervalSec=0
+
+[Container]
+Image=quay.io/prometheus/snmp-exporter:v0.30.1
+GlobalArgs=--storage-opt=additionalimagestore=/usr/lib/bootc/storage
+# Image is logically bound, so bootc keeps it in the additional store above
+Pull=never
+ContainerName=snmp-exporter
+# VictoriaMetrics scrapes it on loopback.
+Network=host
+Environment=TZ=Pacific/Auckland
+Volume=/run/snmp-exporter/exporter-auth.yml:/etc/snmp_exporter/auth.yml:ro
+SecurityLabelDisable=true
+Exec=--config.file=/etc/snmp_exporter/snmp.yml --config.file=/etc/snmp_exporter/auth.yml --web.listen-address=127.0.0.1:9116
+
+[Service]
+Restart=always
+RestartSec=30
+# The exporter runs as nobody and secrets are root-only. The directory stays
+# 0700, so the copy is readable only through the mount.
+ExecStartPre=/usr/bin/install -m 0400 -o 65534 /run/snmp-exporter/auth.yml /run/snmp-exporter/exporter-auth.yml
+
+[Install]
+WantedBy=multi-user.target

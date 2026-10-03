@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 60s
+
+scrape_configs:
+  - job_name: edgerouter
+    metrics_path: /snmp
+    params:
+      # The auth is defined in /run/snmp-exporter/auth.yml from secrets.
+      auth: [edgerouter]
+      module: [if_mib, hrSystem, ucd_system_stats, ucd_memory, ucd_la_table]
+    static_configs:
+      - targets: [192.168.4.1]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 127.0.0.1:9116

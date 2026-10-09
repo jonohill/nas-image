@@ -501,6 +501,121 @@
     },
     {
       "type": "timeseries",
+      "title": "Lost pings",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "description": "Each target is pinged once a second, so lost pings is roughly seconds without a reply. Single lost pings are hidden, because a ping in flight at a scrape counts as lost in one interval and answered in the next. Loss on every target means the NAS or LAN. Loss past the router means the ISP or beyond.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "interval": "15s",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "clamp_min(increase(smokeping_requests_total{job=\"internet\"}[$__interval]) - increase(smokeping_response_duration_seconds_count{job=\"internet\"}[$__interval]), 0) > 1",
+          "legendFormat": "{{hop}} {{host}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "id": 14
+    },
+    {
+      "type": "timeseries",
+      "title": "Ping round-trip time",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "description": "Mean per target. A rise without loss points to queueing on the uplink.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
+      "interval": "15s",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "rate(smokeping_response_duration_seconds_sum{job=\"internet\"}[$__rate_interval]) / rate(smokeping_response_duration_seconds_count{job=\"internet\"}[$__rate_interval])",
+          "legendFormat": "{{hop}} {{host}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "scaleDistribution": {
+              "type": "log",
+              "log": 10
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "id": 15
+    },
+    {
+      "type": "timeseries",
       "title": "Receive by interface",
       "datasource": {
         "type": "prometheus",
@@ -510,7 +625,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 13
+        "y": 21
       },
       "targets": [
         {
@@ -562,7 +677,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 13
+        "y": 21
       },
       "targets": [
         {
@@ -614,7 +729,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 21
+        "y": 29
       },
       "targets": [
         {
@@ -721,7 +836,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 21
+        "y": 29
       },
       "targets": [
         {
@@ -801,7 +916,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 21
+        "y": 29
       },
       "targets": [
         {
@@ -854,7 +969,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 29
+        "y": 37
       },
       "targets": [
         {

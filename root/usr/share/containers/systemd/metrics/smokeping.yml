@@ -1,0 +1,16 @@
+# protocol: udp still sends ICMP echo, through an unprivileged datagram socket
+# (net.ipv4.ping_group_range). protocol: icmp would need a raw socket.
+targets:
+  - hosts: [192.168.4.1]
+    protocol: udp
+    labels: {hop: lan, family: ipv4}
+  # The ISP's IPv4 hops don't answer echo requests.
+  - hosts: ["2401:7000:d900::1"]
+    protocol: udp
+    labels: {hop: isp, family: ipv6}
+  - hosts: [1.1.1.1, 8.8.8.8]
+    protocol: udp
+    labels: {hop: internet, family: ipv4}
+  - hosts: ["2606:4700:4700::1111", "2001:4860:4860::8888"]
+    protocol: udp
+    labels: {hop: internet, family: ipv6}

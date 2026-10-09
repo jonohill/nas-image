@@ -17,3 +17,13 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: 127.0.0.1:9116
+
+  - job_name: internet
+    # The prober pings every second and exports running counters, so the
+    # interval sets how precisely an outage can be placed, not whether it's seen.
+    scrape_interval: 15s
+    static_configs:
+      - targets: [127.0.0.1:9374]
+    metric_relabel_configs:
+      - regex: source|tos
+        action: labeldrop

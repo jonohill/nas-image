@@ -1,0 +1,31 @@
+[Unit]
+Description=Prometheus smokeping prober
+After=network-online.target
+Wants=network-online.target
+# A failed unit at boot triggers a greenboot rollback, so keep restarting
+# rather than parking the unit as failed.
+StartLimitIntervalSec=0
+
+[Container]
+Image=quay.io/superq/smokeping-prober:v0.12.0
+GlobalArgs=--storage-opt=additionalimagestore=/usr/lib/bootc/storage
+# Image is logically bound, so bootc keeps it in the additional store above
+Pull=never
+ContainerName=smokeping-prober
+# VictoriaMetrics scrapes it on loopback. The host network namespace also
+# supplies the host's ping_group_range, which covers nobody.
+Network=host
+User=65534
+Group=65534
+DropCapability=all
+Environment=TZ=Pacific/Auckland GOMAXPROCS=1
+Volume=/usr/share/containers/systemd/metrics/smokeping.yml:/etc/smokeping_prober/smokeping.yml:ro
+SecurityLabelDisable=true
+Exec=--config.file=/etc/smokeping_prober/smokeping.yml --web.listen-address=127.0.0.1:9374 --buckets=0.0005,0.001,0.002,0.004,0.008,0.016,0.032,0.064,0.128,0.256,0.512,1.024
+
+[Service]
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

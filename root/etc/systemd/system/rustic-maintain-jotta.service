@@ -2,6 +2,9 @@
 Description=Forget, prune and check the jotta rustic repo
 Requires=zfs-tank.service download-secrets.service
 After=zfs-tank.service download-secrets.service
+# Both maintenance units start with offpeak.target, and each loads a full
+# index. Run them in sequence so their memory peaks don't add up.
+After=rustic-maintain-nas.service
 
 [Service]
 Type=oneshot

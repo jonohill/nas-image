@@ -9,5 +9,5 @@ Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
 Environment=TZ=Pacific/Auckland
 EnvironmentFile=/run/rustic/env
 ExecCondition=/usr/local/sbin/rustic-due nas-maintain-nas 6
-ExecCondition=/usr/local/sbin/rustic-idle nas-ssd-data
+ExecCondition=/usr/local/sbin/rustic-idle nas-ssd-data nas-copy
 ExecStart=/usr/local/sbin/rustic-job nas-maintain-nas /usr/local/sbin/rustic-maintain-nas

@@ -100,7 +100,7 @@ ARG RUSTIC_VERSION=0.11.4
 # rclone reads every RCLONE_* environment variable as a flag, so the ARG
 # must not be named RCLONE_VERSION.
 # renovate: datasource=github-releases depName=rclone/rclone extractVersion=^v(?<version>.*)$
-ARG RCLONE_RELEASE=1.75.1
+ARG RCLONE_RELEASE=1.75.2
 RUN cd /tmp && \
     tarball="rustic-v${RUSTIC_VERSION}-x86_64-unknown-linux-gnu.tar.gz" && \
     curl -fsSLO "https://github.com/rustic-rs/rustic/releases/download/v${RUSTIC_VERSION}/${tarball}" && \

@@ -1,18 +1,44 @@
 "use strict";
 
-// path: where the Cockpit tunnel routes the app on this hostname.
+// One section per app, with a tile per page inside it. The section heading
+// links to the app's home.
+// path: where the Cockpit tunnel routes the page on this hostname.
 // port: where the app listens on the LAN and tailnet.
-const APPS = [
-    { name: "Grafana", icon: "grafana.svg", path: "/grafana/", port: 3000 },
+const SECTIONS = [
+    {
+        name: "Grafana", icon: "grafana.svg", path: "/grafana/", port: 3000,
+        pages: [
+            { name: "EdgeRouter", icon: "edgerouter.svg", path: "/grafana/d/edgerouter" },
+            { name: "Backups", icon: "backups.svg", path: "/grafana/d/backups" },
+        ],
+    },
 ];
 
 // The tunnel serves Cockpit on the default HTTPS port. Direct access always
 // names port 9090.
-function appUrl(app) {
+function appUrl(path, port) {
     const loc = window.location;
     if (loc.port === "")
-        return `${loc.origin}${app.path}`;
-    return `http://${loc.hostname}:${app.port}${app.path}`;
+        return `${loc.origin}${path}`;
+    return `http://${loc.hostname}:${port}${path}`;
+}
+
+function appLink(name, icon, url) {
+    const link = document.createElement("a");
+    link.href = url;
+    // Cockpit pages run in an iframe.
+    link.target = "_blank";
+    link.rel = "noopener";
+
+    const img = document.createElement("img");
+    img.src = icon;
+    img.alt = "";
+
+    const label = document.createElement("span");
+    label.textContent = name;
+
+    link.append(img, label);
+    return link;
 }
 
 // Same logic as Cockpit's own pages, which follow the shell's style setting.
@@ -32,24 +58,21 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
 applyTheme();
 
 document.addEventListener("DOMContentLoaded", () => {
-    const list = document.getElementById("apps");
-    for (const app of APPS) {
-        const link = document.createElement("a");
-        link.href = appUrl(app);
-        // Cockpit pages run in an iframe.
-        link.target = "_blank";
-        link.rel = "noopener";
+    const main = document.getElementById("apps");
+    for (const section of SECTIONS) {
+        const heading = document.createElement("h2");
+        heading.append(appLink(section.name, section.icon, appUrl(section.path, section.port)));
 
-        const icon = document.createElement("img");
-        icon.src = app.icon;
-        icon.alt = "";
+        const list = document.createElement("ul");
+        list.className = "grid";
+        for (const page of section.pages) {
+            const item = document.createElement("li");
+            item.append(appLink(page.name, page.icon, appUrl(page.path, section.port)));
+            list.append(item);
+        }
 
-        const label = document.createElement("span");
-        label.textContent = app.name;
-
-        link.append(icon, label);
-        const item = document.createElement("li");
-        item.append(link);
-        list.append(item);
+        const element = document.createElement("section");
+        element.append(heading, list);
+        main.append(element);
     }
 });

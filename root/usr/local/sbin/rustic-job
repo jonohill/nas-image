@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run one backup job and report it to healthchecks.
+# Run one backup job and report it to healthchecks and node_exporter.
 #
 #   rustic-job <job-name> <command...>
 #
@@ -7,7 +7,13 @@
 # success and failure, with the tail of the output as the body. Touches
 # /var/lib/rustic/last-start/<job-name> at start and last-success/<job-name>
 # on success, for rustic-due and rustic-idle. A run fails if the command
-# exits non-zero or logs a line starting with [ERROR].
+# exits non-zero or logs a line starting with [ERROR]. A run stopped by
+# SIGTERM, as at the nightly update reboot, is recorded as interrupted and
+# sent as a /log ping, which doesn't change the check's state.
+#
+# Writes rustic-<job-name>.prom to the node_exporter textfile directory, see
+# docs/metrics.md. With RUSTIC_JSON_PROGRESS=true, rustic's JSON status lines
+# become progress metrics and stay out of the journal.
 #
 # Always exits 0: a failed unit at boot triggers a greenboot rollback, so
 # failures are reported through healthchecks instead.
@@ -24,36 +30,197 @@ shift
 url_var="HC_URL_$(echo "$job" | tr 'a-z-' 'A-Z_')"
 url=${!url_var:-}
 
-output=$(mktemp)
-body=$(mktemp)
-trap 'rm -f "$output" "$body"' EXIT
+textfile_dir=/var/lib/node-exporter/textfile
+prom="$textfile_dir/rustic-$job.prom"
+success_stamp="/var/lib/rustic/last-success/$job"
+
+tmp=$(mktemp -d)
+output="$tmp/output"
+body="$tmp/body"
+fifo="$tmp/fifo"
+trap 'rm -rf "$tmp"' EXIT
+
+unit=""
+if cgroup=$(cut -d: -f3 /proc/self/cgroup) && [[ $cgroup == *.service ]]; then
+    unit=${cgroup##*/}
+fi
 
 ping() {
     [ -n "$url" ] || return 0
     curl -fsS -m 10 --retry 3 -o /dev/null "$@" || true
 }
 
-mkdir -p /var/lib/rustic/last-start /var/lib/rustic/last-success
+running=1
+start=$EPOCHSECONDS
+warnings=0
+errors=0
+retries=0
+progress_ratio="" progress_done="" progress_total="" progress_eta=""
+summary=""
+
+# Metrics of the last finished run stay in the file while the next run is in
+# progress, so the dashboard keeps its result until the new one replaces it.
+finished=""
+if [ -f "$prom" ]; then
+    finished=$(grep -E '^rustic_job_(end_timestamp_seconds|result|exit_code|duration_seconds|data_added|files_)' "$prom")
+fi
+
+metric() {
+    [ -n "$2" ] || return 0
+    printf 'rustic_job_%s{job="%s",unit="%s"%s} %s\n' "$1" "$job" "$unit" "${3:+,$3}" "$2"
+}
+
+unit_metrics() {
+    local key value
+    while IFS='=' read -r key value; do
+        [[ $value =~ ^[0-9]+$ ]] || continue
+        case $key in
+            IPEgressBytes) metric ip_egress_bytes "$value" ;;
+            MemoryPeak) metric memory_peak_bytes "$value" ;;
+            MemorySwapPeak) metric swap_peak_bytes "$value" ;;
+        esac
+    done < <(systemctl show -p IPEgressBytes -p MemoryPeak -p MemorySwapPeak "$unit" 2>/dev/null)
+}
+
+write_metrics() {
+    {
+        metric running "$running"
+        metric start_timestamp_seconds "$start"
+        [ -e "$success_stamp" ] &&
+            metric last_success_timestamp_seconds "$(stat -c %Y "$success_stamp")"
+        metric warnings "$warnings"
+        metric errors "$errors"
+        metric upload_retries "$retries"
+        [ -n "$unit" ] && unit_metrics
+        if [ "$running" = 1 ] && [ -n "$progress_ratio" ]; then
+            metric progress_ratio "$progress_ratio"
+            metric progress_bytes_done "$progress_done"
+            metric progress_bytes_total "$progress_total"
+            metric progress_eta_seconds "$progress_eta"
+        fi
+        if [ -n "$finished" ]; then
+            printf '%s\n' "$finished"
+        fi
+    } > "$prom.tmp"
+    mv "$prom.tmp" "$prom"
+}
+
+json_field() {
+    [[ $2 =~ \"$1\":([0-9.eE+-]+) ]] && echo "${BASH_REMATCH[1]}"
+}
+
+handle_line() {
+    local line=$1
+    case $line in
+        '{"message_type":"status"'*)
+            progress_ratio=$(json_field percent_done "$line")
+            progress_done=$(json_field bytes_done "$line")
+            progress_total=$(json_field total_bytes "$line")
+            progress_eta=$(json_field seconds_remaining "$line")
+            write_metrics
+            return
+            ;;
+        '{"message_type":"summary"'*)
+            summary=$line
+            ;;
+        '[WARN]'*)
+            warnings=$(( warnings + 1 ))
+            # rustic logs each backend retry as a warning ending in "retrying".
+            [[ $line == *retrying ]] && retries=$(( retries + 1 ))
+            ;;
+        '[ERROR]'*)
+            errors=$(( errors + 1 ))
+            ;;
+    esac
+    printf '%s\n' "$line" | tee -a "$output"
+}
+
+mkdir -p /var/lib/rustic/last-start /var/lib/rustic/last-success "$textfile_dir"
 touch "/var/lib/rustic/last-start/$job"
+write_metrics
 ping "$url/start"
 
-"$@" 2>&1 | tee "$output"
-rc=${PIPESTATUS[0]}
+# systemd sends SIGTERM to every process in the unit at once. rustic needs
+# its output read until it has finished writing its index, so the reader
+# here keeps going and only records the interruption.
+interrupted=0
+trap 'interrupted=1' TERM
+
+mkfifo "$fifo"
+"$@" > "$fifo" 2>&1 &
+pid=$!
+
+# read returns above 128 on its 10 s timeout and on the trapped SIGTERM. A
+# partial line read before either is kept and completed by the next read.
+partial=""
+while :; do
+    if IFS= read -r -t 10 chunk; then
+        handle_line "$partial$chunk"
+        partial=""
+    elif [ $? -gt 128 ]; then
+        partial+=$chunk
+        write_metrics
+    else
+        [ -n "$partial$chunk" ] && handle_line "$partial$chunk"
+        break
+    fi
+done < "$fifo"
+
+while :; do
+    wait "$pid"
+    rc=$?
+    [ "$rc" -gt 128 ] && kill -0 "$pid" 2>/dev/null && continue
+    break
+done
 
 # rustic copy logs a failed upload to the target as [ERROR] and exits 0.
-if [ "$rc" -eq 0 ] && grep -q '^\[ERROR\]' "$output"; then
-    echo "rustic-job: $job logged [ERROR] despite exit 0" >&2
+if [ "$rc" -eq 0 ] && [ "$errors" -gt 0 ]; then
+    echo "rustic-job: $job logged [ERROR] despite exit 0" | tee -a "$output" >&2
     rc=1
 fi
 
+if [ "$interrupted" = 1 ]; then
+    result=interrupted
+elif [ "$rc" -eq 0 ]; then
+    result=success
+else
+    result=failed
+fi
+
+end=$EPOCHSECONDS
+finished=$(
+    metric end_timestamp_seconds "$end"
+    metric result 1 "result=\"$result\""
+    metric exit_code "$rc"
+    metric duration_seconds "$(( end - start ))"
+    if [ -n "$summary" ]; then
+        for field in data_added data_added_packed; do
+            metric "${field}_bytes" "$(json_field "$field" "$summary")"
+        done
+        for field in files_new files_changed; do
+            metric "$field" "$(json_field "$field" "$summary")"
+        done
+    fi
+)
+
 tail -c 10240 "$output" > "$body"
 
-if [ "$rc" -eq 0 ]; then
-    touch "/var/lib/rustic/last-success/$job"
-    ping --data-binary "@$body" "$url"
-else
-    echo "rustic-job: $job failed (exit $rc)" >&2
-    ping --data-binary "@$body" "$url/fail"
-fi
+case $result in
+    success)
+        touch "$success_stamp"
+        ping --data-binary "@$body" "$url"
+        ;;
+    interrupted)
+        echo "rustic-job: $job interrupted (exit $rc)" >&2
+        ping --data-binary "@$body" "$url/log"
+        ;;
+    failed)
+        echo "rustic-job: $job failed (exit $rc)" >&2
+        ping --data-binary "@$body" "$url/fail"
+        ;;
+esac
+
+running=0
+write_metrics
 
 exit 0

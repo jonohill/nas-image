@@ -113,9 +113,10 @@ RUN cd /tmp && \
 
 RUN chmod 0755 /usr/local/sbin/rustic-zfs-snap /usr/local/sbin/rustic-job \
         /usr/local/sbin/rustic-due /usr/local/sbin/rustic-idle \
-        /usr/local/sbin/rustic-maintain-nas /usr/local/sbin/rustic-maintain-jotta && \
+        /usr/local/sbin/rustic-maintain-nas /usr/local/sbin/rustic-maintain-jotta \
+        /usr/local/sbin/rustic-inventory && \
     systemctl enable rustic-serve.service rustic-ssd-data.timer rustic-copy.timer \
-        rustic-jotta.timer && \
+        rustic-jotta.timer rustic-inventory.timer && \
     systemctl add-wants offpeak.target rustic-maintain-nas.service rustic-maintain-jotta.service
 
 # Logically bound images: quadlet images are pulled with the host image.
@@ -150,9 +151,10 @@ RUN dnf install -y rsyslog && dnf clean all && \
     rm /etc/rsyslog.conf.rpmnew && \
     systemctl enable rsyslog.service
 
-# Router SNMP metrics, see docs/metrics.md. Grafana starts on the first
-# connection to :3000. The proxy runs from a bin_t copy because the shipped
-# binary's SELinux domain can't bind or connect to 3000-3001 (ntop_port_t).
+# Router, host and backup metrics, see docs/metrics.md. Grafana starts on the
+# first connection to :3000. The proxy runs from a bin_t copy because the
+# shipped binary's SELinux domain can't bind or connect to 3000-3001
+# (ntop_port_t).
 RUN install -m 0755 /usr/lib/systemd/systemd-socket-proxyd /usr/local/sbin/grafana-socket-proxyd && \
     systemctl enable grafana-proxy.socket
 

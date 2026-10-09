@@ -1,6 +1,3 @@
-[global]
-no-progress = true
-
 [repository]
 repository = "/var/mnt/tank/backup/rustic"
 password-file = "/run/rustic/password"

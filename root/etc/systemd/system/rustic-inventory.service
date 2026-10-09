@@ -1,0 +1,12 @@
+[Unit]
+Description=Write rustic snapshot and timer metrics for node_exporter
+Requires=zfs-tank.service download-secrets.service
+After=zfs-tank.service download-secrets.service
+
+[Service]
+Type=oneshot
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+Environment=TZ=Pacific/Auckland
+# A failed unit at boot triggers a greenboot rollback, and a missing metric
+# shows on the dashboard as a stale inventory time.
+ExecStart=-/usr/local/sbin/rustic-inventory nas

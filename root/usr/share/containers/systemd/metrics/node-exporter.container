@@ -1,0 +1,40 @@
+[Unit]
+Description=Prometheus node exporter
+After=network-online.target
+Wants=network-online.target
+# A failed unit at boot triggers a greenboot rollback, so keep restarting
+# rather than parking the unit as failed.
+StartLimitIntervalSec=0
+
+[Container]
+Image=quay.io/prometheus/node-exporter:v1.12.1
+GlobalArgs=--storage-opt=additionalimagestore=/usr/lib/bootc/storage
+# Image is logically bound, so bootc keeps it in the additional store above
+Pull=never
+ContainerName=node-exporter
+# VictoriaMetrics scrapes it on loopback, and the network collectors read the
+# host's interfaces.
+Network=host
+PodmanArgs=--pid=host
+Environment=TZ=Pacific/Auckland
+# rslave lets ZFS datasets mounted after the container starts show up.
+Volume=/:/host:ro,rslave
+# The systemd collector talks to systemd over the system bus.
+Volume=/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro
+SecurityLabelDisable=true
+# The mount point exclude is node_exporter's default plus ZFS snapshots, such
+# as the tank/data@rustic snapshot a running backup reads from. systemd turns
+# $$ into $.
+Exec=--path.rootfs=/host --path.udev.data=/host/run/udev/data --web.listen-address=127.0.0.1:9100 \
+    --collector.systemd --collector.systemd.unit-include=(rustic-.+|offpeak)[.](service|timer|target) \
+    --collector.filesystem.mount-points-exclude=^(/(dev|proc|run/credentials/.+|sys|var/lib/docker/.+|var/lib/containers/storage/.+)|.+/[.]zfs/snapshot/.+)($$|/) \
+    --collector.textfile.directory=/host/var/lib/node-exporter/textfile
+
+[Service]
+Restart=always
+RestartSec=30
+# Written by rustic-job and rustic-inventory, see docs/metrics.md.
+ExecStartPre=/usr/bin/mkdir -p /var/lib/node-exporter/textfile
+
+[Install]
+WantedBy=multi-user.target

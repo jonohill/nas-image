@@ -7,7 +7,11 @@ After=zfs-tank.service download-secrets.service
 Type=oneshot
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
 Environment=TZ=Pacific/Auckland
+# Otherwise rustic logs every progress bar to the journal each 10 s. JSON
+# progress would mix several rustic commands into one figure.
+Environment=RUSTIC_NO_PROGRESS=true
 EnvironmentFile=/run/rustic/env
 ExecCondition=/usr/local/sbin/rustic-due nas-maintain-nas 6
 ExecCondition=/usr/local/sbin/rustic-idle nas-ssd-data nas-copy
 ExecStart=/usr/local/sbin/rustic-job nas-maintain-nas /usr/local/sbin/rustic-maintain-nas
+ExecStartPost=-/usr/local/sbin/rustic-inventory nas

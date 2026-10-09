@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Write backup inventory metrics to the node_exporter textfile directory.
+#
+#   rustic-inventory [<profile>...]
+#
+# For each profile, rustic-snapshots-<profile>.prom gets the time and data
+# added of the latest snapshot and the snapshot count per host, label and
+# paths, and the repo's total snapshot count. Always
+# writes rustic-units.prom: the next elapse of the backup and off-peak timers,
+# and rustic-serve's IP counters. See docs/metrics.md.
+set -euo pipefail
+shopt -s inherit_errexit
+
+textfile_dir=/var/lib/node-exporter/textfile
+rustic=/usr/local/bin/rustic
+
+# Run from a backup unit's ExecStartPost=, the environment has
+# RUSTIC_JSON_PROGRESS, which rustic rejects alongside RUSTIC_NO_PROGRESS.
+unset RUSTIC_JSON_PROGRESS RUSTIC_PROGRESS_INTERVAL
+export RUSTIC_NO_PROGRESS=true RUSTIC_LOG_LEVEL=warn
+
+mkdir -p "$textfile_dir"
+
+# Collects the output before replacing the file, so a failed rustic call
+# leaves the previous metrics in place.
+write() {
+    local file=$1 out
+    out=$("${@:2}")
+    printf '%s\n' "$out" > "$file.tmp"
+    mv "$file.tmp" "$file"
+}
+
+label_escape() {
+    local s=${1//\\/\\\\}
+    printf '%s' "${s//\"/\\\"}"
+}
+
+snapshots() {
+    local profile=$1 json host label paths time added count labels
+    json=$("$rustic" -P "$profile" snapshots --json)
+    # The old mac manager left one group per sentinel snapshot on jotta.
+    jq -r '.[] | select(.group_key.paths | any(contains("/rustic-sentinel-")) | not) | [
+            .group_key.hostname, .group_key.label, (.group_key.paths | join(",")),
+            (.snapshots | last | .time), (.snapshots | last | .summary.data_added // ""),
+            (.snapshots | length)
+        ] | map(tostring) | join("\u001f")' <<< "$json" |
+        while IFS=$'\x1f' read -r host label paths time added count; do
+            labels="repo=\"$profile\",host=\"$(label_escape "$host")\",label=\"$(label_escape "$label")\",paths=\"$(label_escape "$paths")\""
+            echo "rustic_snapshot_latest_timestamp_seconds{$labels} $(date -d "$time" +%s)"
+            [ -n "$added" ] && echo "rustic_snapshot_latest_data_added_bytes{$labels} $added"
+            echo "rustic_snapshot_count{$labels} $count"
+        done
+    echo "rustic_repo_snapshots{repo=\"$profile\"} $(jq '[.[].snapshots | length] | add // 0' <<< "$json")"
+    echo "rustic_inventory_timestamp_seconds{repo=\"$profile\"} $EPOCHSECONDS"
+}
+
+units() {
+    local timer service next key value
+    for timer in $(systemctl list-unit-files --no-legend 'rustic-*.timer' offpeak-start.timer | cut -d' ' -f1); do
+        service=$(systemctl show -P Unit "$timer")
+        next=$(systemctl show -P NextElapseUSecRealtime "$timer")
+        # Empty while a job its timer started is still running.
+        [ -n "$next" ] || continue
+        echo "rustic_timer_next_elapse_timestamp_seconds{timer=\"$timer\",unit=\"$service\"} $(date -d "$next" +%s)"
+    done
+    while IFS='=' read -r key value; do
+        [[ $value =~ ^[0-9]+$ ]] || continue
+        case $key in
+            IPIngressBytes) echo "rustic_serve_ip_ingress_bytes $value" ;;
+            IPEgressBytes) echo "rustic_serve_ip_egress_bytes $value" ;;
+        esac
+    done < <(systemctl show -p IPIngressBytes -p IPEgressBytes rustic-serve.service)
+}
+
+for profile in "$@"; do
+    write "$textfile_dir/rustic-snapshots-$profile.prom" snapshots "$profile"
+done
+write "$textfile_dir/rustic-units.prom" units

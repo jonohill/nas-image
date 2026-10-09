@@ -10,6 +10,7 @@ ConditionPathExists=/var/mnt/tank/backup/rustic/config
 StartLimitIntervalSec=0
 
 [Service]
+IPAccounting=yes
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
 Environment=TZ=Pacific/Auckland
 EnvironmentFile=/run/rustic/env

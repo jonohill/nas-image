@@ -7,5 +7,7 @@ After=zfs-ssd.service zfs-tank.service download-secrets.service
 Type=oneshot
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
 Environment=TZ=Pacific/Auckland
+Environment=RUSTIC_JSON_PROGRESS=true
 EnvironmentFile=/run/rustic/env
 ExecStart=/usr/local/sbin/rustic-job nas-ssd-data /usr/local/bin/rustic -P ssd-data backup
+ExecStartPost=-/usr/local/sbin/rustic-inventory nas

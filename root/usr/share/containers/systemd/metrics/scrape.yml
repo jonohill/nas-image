@@ -27,3 +27,10 @@ scrape_configs:
     metric_relabel_configs:
       - regex: source|tos
         action: labeldrop
+
+  - job_name: node
+    # Keeps the job label that rustic-job and rustic-inventory set on their
+    # textfile metrics. node_exporter's own metrics have none and get "node".
+    honor_labels: true
+    static_configs:
+      - targets: [127.0.0.1:9100]

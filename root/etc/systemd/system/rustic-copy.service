@@ -6,7 +6,10 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+IPAccounting=yes
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
 Environment=TZ=Pacific/Auckland
+Environment=RUSTIC_JSON_PROGRESS=true
 EnvironmentFile=/run/rustic/env
 ExecStart=/usr/local/sbin/rustic-job nas-copy /usr/local/bin/rustic -P nas copy
+ExecStartPost=-/usr/local/sbin/rustic-inventory jotta

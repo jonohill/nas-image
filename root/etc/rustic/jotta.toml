@@ -1,6 +1,3 @@
-[global]
-no-progress = true
-
 [repository]
 repository = "rclone:jotta-raw:backup/rustic"
 password-file = "/run/rustic/password"

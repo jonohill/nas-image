@@ -6,7 +6,7 @@
             "order": 15,
             "keywords": [
                 {
-                    "matches": ["apps", "grafana", "metrics", "dashboard"]
+                    "matches": ["apps", "grafana", "metrics", "dashboard", "backups", "edgerouter"]
                 }
             ]
         }

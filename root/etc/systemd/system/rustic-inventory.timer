@@ -1,0 +1,9 @@
+[Unit]
+Description=Hourly rustic inventory for the backup dashboard
+
+[Timer]
+# The mac backs up hourly. Clear of the 02:00, 02:30 and 03:00 job starts.
+OnCalendar=*-*-* *:15:00
+
+[Install]
+WantedBy=timers.target

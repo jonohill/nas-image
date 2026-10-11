@@ -8,7 +8,7 @@ Wants=network-online.target
 StartLimitIntervalSec=0
 
 [Container]
-Image=ghcr.io/home-assistant/home-assistant:2026.10.0
+Image=ghcr.io/home-assistant/home-assistant:2026.10.1
 GlobalArgs=--storage-opt=additionalimagestore=/usr/lib/bootc/storage
 # Image is logically bound, so bootc keeps it in the additional store above
 Pull=never

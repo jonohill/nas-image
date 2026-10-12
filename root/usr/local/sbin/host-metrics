@@ -1,180 +1,296 @@
-#!/usr/bin/env bash
-# Write host health metrics to the node_exporter textfile directory.
-#
-#   host-metrics <collector>
-#
-# Each collector writes host-<collector>.prom:
-#   zfs    pool, vdev and scrub state from zpool status, and pool space
-#   units  failed systemd units
-#   smart  SMART health and attributes for every disk smartctl finds
-#   bootc  booted, staged and cached image state
-#
-# Every collector only reads state the kernel or a daemon already holds,
-# except smart, which sends each disk a few commands. It skips a disk in
-# standby rather than spin it up.
-set -euo pipefail
-shopt -s inherit_errexit
+#!/usr/bin/python3
+"""Write host health metrics to the node_exporter textfile directory.
 
-textfile_dir=/var/lib/node-exporter/textfile
+    host-metrics <collector>
 
-mkdir -p "$textfile_dir"
+Each collector writes host-<collector>.prom:
+  zfs    pool, vdev and scrub state from zpool status, and pool space
+  units  failed systemd units
+  smart  SMART health and attributes for every disk smartctl finds
+  bootc  booted, staged and cached image state
 
-# Collects the output before replacing the file, so a failed collector
-# leaves the previous metrics in place.
-write() {
-    local file=$1 out
-    out=$("${@:2}")
-    printf '%s\n' "$out" > "$file.tmp"
-    mv "$file.tmp" "$file"
+Every collector only reads state the kernel or a daemon already holds,
+except smart, which sends each disk a few commands. It skips a disk in
+standby rather than spin it up.
+
+The parse_* functions take command output and return metric lines, so the
+tests can feed them saved output. Standard library only: the image has the
+python3 that dnf runs on and nothing more.
+"""
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from datetime import datetime
+
+TEXTFILE_DIR = "/var/lib/node-exporter/textfile"
+
+# zfs_pool_health carries the pool state as a number, for dashboards that
+# colour by value. Anything not listed is 7.
+POOL_HEALTH = {
+    "ONLINE": 0,
+    "DEGRADED": 1,
+    "FAULTED": 2,
+    "OFFLINE": 3,
+    "UNAVAIL": 4,
+    "REMOVED": 5,
+    "SUSPENDED": 6,
 }
+POOL_HEALTH_UNKNOWN = 7
 
-label_escape() {
-    local s=${1//\\/\\\\}
-    printf '%s' "${s//\"/\\\"}"
-}
 
-# Shared jq helpers: esc escapes a label value, lbl renders an object as a
-# label set.
-jq_defs='
-    def esc: tostring | gsub("(?<c>[\\\\\"])"; "\\\(.c)");
-    def lbl: to_entries | map("\(.key)=\"\(.value | esc)\"") | join(",") | "{\(.)}";
-'
+def escape(value):
+    return str(value).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
-zfs_collector() {
-    local name size alloc free frag cap
-    # The vdev walk covers the data, special, dedup and log vdevs, caches and
-    # spares. Spares report only a state. A pool that has never been scanned
-    # has no scan_stats.
-    /usr/sbin/zpool status -j --json-int | jq -r "$jq_defs"'
-        .pools // {} | to_entries[] | .key as $pool | .value |
-        "zfs_pool_state\({pool: $pool, state: .state} | lbl) 1",
-        # The same state as a number, for dashboards that colour by value.
-        "zfs_pool_health\({pool: $pool} | lbl) \({ONLINE: 0, DEGRADED: 1, FAULTED: 2, OFFLINE: 3,
-            UNAVAIL: 4, REMOVED: 5, SUSPENDED: 6}[.state] // 7)",
-        (.error_count // empty | "zfs_pool_data_errors\({pool: $pool} | lbl) \(.)"),
-        (.. | objects | select(.vdev_type? and .vdev_type != "root") |
-            {pool: $pool, vdev: .name, type: .vdev_type, class: (.class // "")} as $v |
-            "zfs_vdev_state\($v + {state: (.state // "UNKNOWN")} | lbl) 1",
-            (.read_errors // empty | "zfs_vdev_read_errors\($v | lbl) \(.)"),
-            (.write_errors // empty | "zfs_vdev_write_errors\($v | lbl) \(.)"),
-            (.checksum_errors // empty | "zfs_vdev_checksum_errors\($v | lbl) \(.)")),
-        (.scan_stats // {} | select(.function and .function != "NONE") |
-            {pool: $pool, function: .function} as $s |
-            "zfs_scan_state\($s + {state: .state} | lbl) 1",
-            "zfs_scan_start_timestamp_seconds\($s | lbl) \(.start_time)",
-            "zfs_scan_repaired_bytes\($s | lbl) \(.processed)",
-            "zfs_scan_errors\($s | lbl) \(.errors)",
-            (select(.state == "FINISHED") |
-                "zfs_scan_end_timestamp_seconds\($s | lbl) \(.end_time)"),
-            # Same progress zpool status prints: done once its I/O is issued.
-            (select(.state == "SCANNING") |
-                (.to_examine - .skipped) as $total |
-                (select($total > 0) |
-                    "zfs_scan_progress_ratio\($s | lbl) \([.issued / $total, 1] | min)"),
-                "zfs_scan_paused\($s | lbl) \(if (.scrub_pause // 0) > 0 then 1 else 0 end)"))
-    '
-    /usr/sbin/zpool list -Hp -o name,size,alloc,free,frag,cap |
-        while IFS=$'\t' read -r name size alloc free frag cap; do
-            name=$(label_escape "$name")
-            echo "zfs_pool_size_bytes{pool=\"$name\"} $size"
-            echo "zfs_pool_allocated_bytes{pool=\"$name\"} $alloc"
-            echo "zfs_pool_free_bytes{pool=\"$name\"} $free"
-            echo "zfs_pool_capacity_percent{pool=\"$name\"} $cap"
-            # "-" when the pool has no spacemap histogram yet.
-            if [[ $frag =~ ^[0-9]+$ ]]; then
-                echo "zfs_pool_fragmentation_percent{pool=\"$name\"} $frag"
-            fi
-        done
-    echo "host_metrics_timestamp_seconds{collector=\"zfs\"} $EPOCHSECONDS"
-}
 
-units_collector() {
-    local failed unit
-    failed=$(systemctl list-units --state=failed --plain --no-legend --full | cut -d' ' -f1)
-    for unit in $failed; do
-        echo "host_systemd_unit_failed{unit=\"$(label_escape "$unit")\"} 1"
-    done
-    echo "host_systemd_failed_units $(wc -w <<< "$failed")"
-    echo "host_metrics_timestamp_seconds{collector=\"units\"} $EPOCHSECONDS"
-}
+def metric(name, labels=None, value=1):
+    """One exposition line. Booleans become 0 or 1."""
+    if isinstance(value, bool):
+        value = int(value)
+    label_set = ""
+    if labels:
+        label_set = "{" + ",".join(f'{k}="{escape(v)}"' for k, v in labels.items()) + "}"
+    return f"{name}{label_set} {value}"
 
-smart_collector() {
-    local name type device json
-    while IFS=$'\t' read -r name type; do
-        device=${name#/dev/}
-        # Exits non-zero for a disk in standby and for any warning it reports,
-        # such as a failing attribute, so the JSON decides what to record.
-        json=$(/usr/sbin/smartctl -j -a -n standby -d "$type" "$name") || true
-        jq -r --arg device "$device" --arg type "$type" "$jq_defs"'
-            {device: $device} as $d |
-            if (.smartctl.messages // [] | any(.string | test("STANDBY|SLEEP"))) then
-                "smart_device_standby\($d | lbl) 1"
-            elif (has("smart_status") | not) then
-                "smart_device_readable\($d | lbl) 0"
-            else
-                "smart_device_standby\($d | lbl) 0",
-                "smart_device_readable\($d | lbl) 1",
-                "smart_device_info\($d + {
-                    type: $type,
-                    protocol: (.device.protocol // ""),
-                    model: (.model_name // ""),
-                    serial: (.serial_number // ""),
-                    rotation_rate: (.rotation_rate // 0)
-                } | lbl) 1",
-                (.user_capacity.bytes // empty | "smart_capacity_bytes\($d | lbl) \(.)"),
-                "smart_status_passed\($d | lbl) \(if .smart_status.passed then 1 else 0 end)",
-                (.temperature.current // empty | "smart_temperature_celsius\($d | lbl) \(.)"),
-                (.power_on_time.hours // empty | "smart_power_on_hours\($d | lbl) \(.)"),
-                (.power_cycle_count // empty | "smart_power_cycles\($d | lbl) \(.)"),
-                (.ata_smart_attributes.table // [] | .[] |
-                    ($d + {id: .id, name: .name}) as $a |
-                    "smart_ata_attribute_raw\($a | lbl) \(.raw.value)",
-                    "smart_ata_attribute_value\($a | lbl) \(.value)",
-                    "smart_ata_attribute_worst\($a | lbl) \(.worst)",
-                    "smart_ata_attribute_threshold\($a | lbl) \(.thresh)",
-                    "smart_ata_attribute_failing\($a | lbl) \(if (.when_failed // "") != "" then 1 else 0 end)"),
-                (.ata_smart_error_log.summary.count // empty |
-                    "smart_ata_error_log_count\($d | lbl) \(.)"),
-                (.ata_smart_self_test_log.standard.table // [] | first // empty |
-                    ($d + {test: .type.string}) as $t |
-                    "smart_self_test_last_passed\($t | lbl) \(if .status.passed then 1 else 0 end)",
-                    "smart_self_test_last_lifetime_hours\($t | lbl) \(.lifetime_hours)"),
-                (.nvme_smart_health_information_log // {} | to_entries[] |
-                    select(.value | type == "number") |
-                    "smart_nvme_\(.key)\($d | lbl) \(.value)")
-            end
-        ' <<< "$json" || echo "smart_device_readable{device=\"$(label_escape "$device")\"} 0"
-    done < <(/usr/sbin/smartctl --scan -j | jq -r '.devices // [] | .[] | [.name, .type] | @tsv')
-    echo "host_metrics_timestamp_seconds{collector=\"smart\"} $EPOCHSECONDS"
-}
 
-bootc_collector() {
-    local json slot stamp
-    json=$(bootc status --format json)
-    jq -r "$jq_defs"'
-        .status as $s |
-        ($s.booted.image // {}) as $b |
-        "bootc_booted_info\({
-            image: ($b.image.image // ""),
-            version: ($b.version // ""),
-            digest: ($b.imageDigest // "")
-        } | lbl) 1",
-        "bootc_staged \(if $s.staged then 1 else 0 end)",
-        "bootc_cached_update \(if $s.booted.cachedUpdate then 1 else 0 end)",
-        "bootc_rollback_queued \(if $s.rollbackQueued then 1 else 0 end)"
-    ' <<< "$json"
-    # Build times are RFC 3339, which jq only parses without fractions.
-    for slot in booted staged; do
-        stamp=$(jq -r --arg slot "$slot" '.status[$slot].image.timestamp // empty' <<< "$json")
-        if [ -n "$stamp" ]; then
-            echo "bootc_image_timestamp_seconds{slot=\"$slot\"} $(date -d "$stamp" +%s)"
-        fi
-    done
-    echo "host_metrics_timestamp_seconds{collector=\"bootc\"} $EPOCHSECONDS"
-}
+def timestamp(collector, now):
+    return metric("host_metrics_timestamp_seconds", {"collector": collector}, int(now))
 
-collector=${1:?usage: host-metrics zfs|units|smart|bootc}
-case $collector in
-    zfs | units | smart | bootc) write "$textfile_dir/host-$collector.prom" "${collector}_collector" ;;
-    *) echo "unknown collector: $collector" >&2; exit 2 ;;
-esac
+
+def run(*cmd, check=True):
+    return subprocess.run(cmd, check=check, capture_output=True, text=True).stdout
+
+
+# ---------------------------------------------------------------- zfs
+
+
+def vdevs(node):
+    """Every vdev under a zpool status pool object, depth first.
+
+    Covers the data, special, dedup and log vdevs, caches and spares, which
+    sit under different keys but all carry vdev_type.
+    """
+    if isinstance(node, dict):
+        if "vdev_type" in node:
+            yield node
+        for child in node.values():
+            yield from vdevs(child)
+
+
+def parse_zfs(status, pool_list, now):
+    """status: zpool status -j --json-int. pool_list: zpool list -Hp output."""
+    lines = []
+    for pool, info in status.get("pools", {}).items():
+        state = info.get("state", "UNKNOWN")
+        lines.append(metric("zfs_pool_state", {"pool": pool, "state": state}))
+        lines.append(metric("zfs_pool_health", {"pool": pool}, POOL_HEALTH.get(state, POOL_HEALTH_UNKNOWN)))
+        if "error_count" in info:
+            lines.append(metric("zfs_pool_data_errors", {"pool": pool}, info["error_count"]))
+
+        for vdev in vdevs(info):
+            if vdev["vdev_type"] == "root":
+                continue
+            labels = {"pool": pool, "vdev": vdev["name"], "type": vdev["vdev_type"], "class": vdev.get("class", "")}
+            lines.append(metric("zfs_vdev_state", labels | {"state": vdev.get("state", "UNKNOWN")}))
+            # Spares report only a state.
+            for kind in ("read", "write", "checksum"):
+                if f"{kind}_errors" in vdev:
+                    lines.append(metric(f"zfs_vdev_{kind}_errors", labels, vdev[f"{kind}_errors"]))
+
+        # A pool that has never been scanned has no scan_stats.
+        scan = info.get("scan_stats") or {}
+        function = scan.get("function", "NONE")
+        if function == "NONE":
+            continue
+        labels = {"pool": pool, "function": function}
+        lines.append(metric("zfs_scan_state", labels | {"state": scan["state"]}))
+        lines.append(metric("zfs_scan_start_timestamp_seconds", labels, scan["start_time"]))
+        lines.append(metric("zfs_scan_repaired_bytes", labels, scan["processed"]))
+        lines.append(metric("zfs_scan_errors", labels, scan["errors"]))
+        if scan["state"] == "FINISHED":
+            lines.append(metric("zfs_scan_end_timestamp_seconds", labels, scan["end_time"]))
+        if scan["state"] == "SCANNING":
+            # Same progress zpool status prints: a block is done once its I/O
+            # is issued.
+            total = scan["to_examine"] - scan["skipped"]
+            if total > 0:
+                lines.append(metric("zfs_scan_progress_ratio", labels, min(scan["issued"] / total, 1)))
+            lines.append(metric("zfs_scan_paused", labels, scan.get("scrub_pause", 0) > 0))
+
+    for row in pool_list.splitlines():
+        name, size, alloc, free, frag, cap = row.split("\t")
+        labels = {"pool": name}
+        lines.append(metric("zfs_pool_size_bytes", labels, size))
+        lines.append(metric("zfs_pool_allocated_bytes", labels, alloc))
+        lines.append(metric("zfs_pool_free_bytes", labels, free))
+        lines.append(metric("zfs_pool_capacity_percent", labels, cap))
+        # "-" when the pool has no spacemap histogram yet.
+        if frag.isdigit():
+            lines.append(metric("zfs_pool_fragmentation_percent", labels, frag))
+
+    lines.append(timestamp("zfs", now))
+    return lines
+
+
+def collect_zfs(now):
+    status = json.loads(run("/usr/sbin/zpool", "status", "-j", "--json-int"))
+    pool_list = run("/usr/sbin/zpool", "list", "-Hp", "-o", "name,size,alloc,free,frag,cap")
+    return parse_zfs(status, pool_list, now)
+
+
+# ---------------------------------------------------------------- units
+
+
+def parse_units(list_units, now):
+    """list_units: systemctl list-units --state=failed --plain --no-legend --full."""
+    failed = [row.split()[0] for row in list_units.splitlines() if row.strip()]
+    lines = [metric("host_systemd_unit_failed", {"unit": unit}) for unit in failed]
+    lines.append(metric("host_systemd_failed_units", value=len(failed)))
+    lines.append(timestamp("units", now))
+    return lines
+
+
+def collect_units(now):
+    return parse_units(run("systemctl", "list-units", "--state=failed", "--plain", "--no-legend", "--full"), now)
+
+
+# ---------------------------------------------------------------- smart
+
+
+def parse_smart_device(device, dev_type, report):
+    """report: smartctl -j -a -n standby output for one disk, possibly empty."""
+    labels = {"device": device}
+    messages = report.get("smartctl", {}).get("messages", [])
+    if any(re.search("STANDBY|SLEEP", m.get("string", "")) for m in messages):
+        return [metric("smart_device_standby", labels)]
+    if "smart_status" not in report:
+        return [metric("smart_device_readable", labels, 0)]
+
+    lines = [
+        metric("smart_device_standby", labels, 0),
+        metric("smart_device_readable", labels),
+        metric("smart_device_info", labels | {
+            "type": dev_type,
+            "protocol": report.get("device", {}).get("protocol", ""),
+            "model": report.get("model_name", ""),
+            "serial": report.get("serial_number", ""),
+            "rotation_rate": report.get("rotation_rate", 0),
+        }),
+        metric("smart_status_passed", labels, bool(report["smart_status"].get("passed"))),
+    ]
+    optional = {
+        "smart_capacity_bytes": report.get("user_capacity", {}).get("bytes"),
+        "smart_temperature_celsius": report.get("temperature", {}).get("current"),
+        "smart_power_on_hours": report.get("power_on_time", {}).get("hours"),
+        "smart_power_cycles": report.get("power_cycle_count"),
+        "smart_ata_error_log_count": report.get("ata_smart_error_log", {}).get("summary", {}).get("count"),
+    }
+    lines += [metric(name, labels, value) for name, value in optional.items() if value is not None]
+
+    for attr in report.get("ata_smart_attributes", {}).get("table", []):
+        attr_labels = labels | {"id": attr["id"], "name": attr["name"]}
+        lines.append(metric("smart_ata_attribute_raw", attr_labels, attr["raw"]["value"]))
+        lines.append(metric("smart_ata_attribute_value", attr_labels, attr["value"]))
+        lines.append(metric("smart_ata_attribute_worst", attr_labels, attr["worst"]))
+        lines.append(metric("smart_ata_attribute_threshold", attr_labels, attr["thresh"]))
+        # when_failed is "now" or "past" once the value has crossed thresh.
+        lines.append(metric("smart_ata_attribute_failing", attr_labels, bool(attr.get("when_failed"))))
+
+    tests = report.get("ata_smart_self_test_log", {}).get("standard", {}).get("table", [])
+    if tests:
+        last = tests[0]
+        test_labels = labels | {"test": last["type"]["string"]}
+        lines.append(metric("smart_self_test_last_passed", test_labels, bool(last["status"].get("passed"))))
+        lines.append(metric("smart_self_test_last_lifetime_hours", test_labels, last["lifetime_hours"]))
+
+    for key, value in report.get("nvme_smart_health_information_log", {}).items():
+        # Skips the per-sensor temperature list.
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            lines.append(metric(f"smart_nvme_{key}", labels, value))
+    return lines
+
+
+def collect_smart(now):
+    lines = []
+    for dev in json.loads(run("/usr/sbin/smartctl", "--scan", "-j")).get("devices", []):
+        name, dev_type = dev["name"], dev["type"]
+        device = name.removeprefix("/dev/")
+        try:
+            # Exits non-zero for a disk in standby and for any warning it
+            # reports, such as a failing attribute, so the JSON decides.
+            out = run("/usr/sbin/smartctl", "-j", "-a", "-n", "standby", "-d", dev_type, name, check=False)
+            lines += parse_smart_device(device, dev_type, json.loads(out) if out.strip() else {})
+        except (ValueError, KeyError, TypeError) as e:
+            print(f"{name}: {e!r}", file=sys.stderr)
+            lines.append(metric("smart_device_readable", {"device": device}, 0))
+    lines.append(timestamp("smart", now))
+    return lines
+
+
+# ---------------------------------------------------------------- bootc
+
+
+def parse_rfc3339(value):
+    """Seconds since the epoch. fromisoformat takes at most microseconds."""
+    value = re.sub(r"(\.\d{6})\d+", r"\1", value).replace("Z", "+00:00")
+    return int(datetime.fromisoformat(value).timestamp())
+
+
+def parse_bootc(status, now):
+    """status: bootc status --format json."""
+    s = status.get("status", {})
+    booted = s.get("booted") or {}
+    image = booted.get("image") or {}
+    lines = [
+        metric("bootc_booted_info", {
+            "image": (image.get("image") or {}).get("image", ""),
+            "version": image.get("version") or "",
+            "digest": image.get("imageDigest", ""),
+        }),
+        metric("bootc_staged", value=bool(s.get("staged"))),
+        metric("bootc_cached_update", value=bool(booted.get("cachedUpdate"))),
+        metric("bootc_rollback_queued", value=bool(s.get("rollbackQueued"))),
+    ]
+    for slot in ("booted", "staged"):
+        stamp = ((s.get(slot) or {}).get("image") or {}).get("timestamp")
+        if stamp:
+            lines.append(metric("bootc_image_timestamp_seconds", {"slot": slot}, parse_rfc3339(stamp)))
+    lines.append(timestamp("bootc", now))
+    return lines
+
+
+def collect_bootc(now):
+    return parse_bootc(json.loads(run("bootc", "status", "--format", "json")), now)
+
+
+# ---------------------------------------------------------------- main
+
+COLLECTORS = {"zfs": collect_zfs, "units": collect_units, "smart": collect_smart, "bootc": collect_bootc}
+
+
+def write(path, lines):
+    """Replace the file whole, so node_exporter never reads half of it."""
+    with open(f"{path}.tmp", "w") as f:
+        f.write("\n".join(lines) + "\n")
+    os.replace(f"{path}.tmp", path)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Write host health metrics for node_exporter.")
+    parser.add_argument("collector", choices=COLLECTORS)
+    parser.add_argument("--textfile-dir", default=TEXTFILE_DIR)
+    args = parser.parse_args(argv)
+
+    # Collects everything before writing, so a failed collector leaves the
+    # previous metrics in place.
+    lines = COLLECTORS[args.collector](time.time())
+    os.makedirs(args.textfile_dir, exist_ok=True)
+    write(os.path.join(args.textfile_dir, f"host-{args.collector}.prom"), lines)
+
+
+if __name__ == "__main__":
+    main()

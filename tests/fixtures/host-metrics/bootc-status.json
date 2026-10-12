@@ -1,0 +1,32 @@
+{
+  "apiVersion": "org.containers.bootc/v1",
+  "kind": "BootcHost",
+  "spec": {},
+  "status": {
+    "staged": {
+      "image": {
+        "image": {
+          "image": "ghcr.io/jonohill/nas-image:latest",
+          "transport": "registry"
+        },
+        "version": null,
+        "timestamp": "2026-10-12T01:02:03.456Z",
+        "imageDigest": "sha256:bbb"
+      }
+    },
+    "booted": {
+      "image": {
+        "image": {
+          "image": "ghcr.io/jonohill/nas-image:latest",
+          "transport": "registry"
+        },
+        "version": "10.0",
+        "timestamp": "2026-10-05T01:02:03Z",
+        "imageDigest": "sha256:aaa"
+      },
+      "cachedUpdate": null
+    },
+    "rollback": null,
+    "rollbackQueued": false
+  }
+}

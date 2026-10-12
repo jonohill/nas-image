@@ -216,7 +216,10 @@ def parse_smart_device(device, dev_type, report):
 
 def collect_smart(now):
     lines = []
-    for dev in json.loads(run("/usr/sbin/smartctl", "--scan", "-j")).get("devices", []):
+    # --scan names libata disks "scsi", and -d scsi then reads no ATA SMART
+    # data. --scan-open probes each with an INQUIRY, which does not spin up a
+    # disk in standby.
+    for dev in json.loads(run("/usr/sbin/smartctl", "--scan-open", "-j")).get("devices", []):
         name, dev_type = dev["name"], dev["type"]
         device = name.removeprefix("/dev/")
         try:

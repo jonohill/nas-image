@@ -45,7 +45,7 @@ def fake_run(*cmd, check=True):
             return fixture("zpool-list.txt")
         case ("systemctl", "list-units", *_):
             return fixture("systemctl-failed.txt")
-        case ("/usr/sbin/smartctl", "--scan", *_):
+        case ("/usr/sbin/smartctl", "--scan-open", *_):
             return fixture("smartctl-scan.json")
         case ("/usr/sbin/smartctl", *_, device):
             return fixture(f"smartctl-{device.removeprefix('/dev/')}.json")
@@ -105,7 +105,7 @@ class Behaviour(unittest.TestCase):
 
     def test_unparseable_disk_is_unreadable(self):
         with mock.patch.object(hm, "run", side_effect=lambda *c, check=True:
-                               '{"devices":[{"name":"/dev/sda","type":"sat"}]}' if "--scan" in c else "not json"):
+                               '{"devices":[{"name":"/dev/sda","type":"sat"}]}' if "--scan-open" in c else "not json"):
             lines = hm.collect_smart(NOW)
         self.assertIn('smart_device_readable{device="sda"} 0', lines)
 

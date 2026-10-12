@@ -3,7 +3,7 @@ Description=Unlock %i dataset on demand (passphrase prompt)
 # Not part of the boot chain: this is for an operator to unlock manually,
 # e.g. `sudo zfs-unlock tank/private` or `systemctl start zfs-unlock@tank-private`.
 # The passphrase is read from the controlling terminal (console or SSH).
-# Daily scrubbing is unaffected: scrubs work on locked pools.
+# Scrubbing is unaffected: scrubs work on locked datasets.
 After=zfs-tank.service
 
 [Service]

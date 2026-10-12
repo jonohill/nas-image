@@ -1,0 +1,11 @@
+[Unit]
+Description=Collect SMART and bootc metrics every 30 minutes
+
+[Timer]
+# SMART values move over days, and a disk in standby is skipped rather than
+# woken, so there is nothing to gain from polling faster.
+OnCalendar=*:0/30
+OnBootSec=5min
+
+[Install]
+WantedBy=timers.target

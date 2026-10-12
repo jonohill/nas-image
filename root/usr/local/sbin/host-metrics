@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+# Write host health metrics to the node_exporter textfile directory.
+#
+#   host-metrics <collector>
+#
+# Each collector writes host-<collector>.prom:
+#   zfs    pool, vdev and scrub state from zpool status, and pool space
+#   units  failed systemd units
+#   smart  SMART health and attributes for every disk smartctl finds
+#   bootc  booted, staged and cached image state
+#
+# Every collector only reads state the kernel or a daemon already holds,
+# except smart, which sends each disk a few commands. It skips a disk in
+# standby rather than spin it up.
+set -euo pipefail
+shopt -s inherit_errexit
+
+textfile_dir=/var/lib/node-exporter/textfile
+
+mkdir -p "$textfile_dir"
+
+# Collects the output before replacing the file, so a failed collector
+# leaves the previous metrics in place.
+write() {
+    local file=$1 out
+    out=$("${@:2}")
+    printf '%s\n' "$out" > "$file.tmp"
+    mv "$file.tmp" "$file"
+}
+
+label_escape() {
+    local s=${1//\\/\\\\}
+    printf '%s' "${s//\"/\\\"}"
+}
+
+# Shared jq helpers: esc escapes a label value, lbl renders an object as a
+# label set.
+jq_defs='
+    def esc: tostring | gsub("(?<c>[\\\\\"])"; "\\\(.c)");
+    def lbl: to_entries | map("\(.key)=\"\(.value | esc)\"") | join(",") | "{\(.)}";
+'
+
+zfs_collector() {
+    local name size alloc free frag cap
+    # The vdev walk covers the data, special, dedup and log vdevs, caches and
+    # spares. Spares report only a state. A pool that has never been scanned
+    # has no scan_stats.
+    /usr/sbin/zpool status -j --json-int | jq -r "$jq_defs"'
+        .pools // {} | to_entries[] | .key as $pool | .value |
+        "zfs_pool_state\({pool: $pool, state: .state} | lbl) 1",
+        # The same state as a number, for dashboards that colour by value.
+        "zfs_pool_health\({pool: $pool} | lbl) \({ONLINE: 0, DEGRADED: 1, FAULTED: 2, OFFLINE: 3,
+            UNAVAIL: 4, REMOVED: 5, SUSPENDED: 6}[.state] // 7)",
+        (.error_count // empty | "zfs_pool_data_errors\({pool: $pool} | lbl) \(.)"),
+        (.. | objects | select(.vdev_type? and .vdev_type != "root") |
+            {pool: $pool, vdev: .name, type: .vdev_type, class: (.class // "")} as $v |
+            "zfs_vdev_state\($v + {state: (.state // "UNKNOWN")} | lbl) 1",
+            (.read_errors // empty | "zfs_vdev_read_errors\($v | lbl) \(.)"),
+            (.write_errors // empty | "zfs_vdev_write_errors\($v | lbl) \(.)"),
+            (.checksum_errors // empty | "zfs_vdev_checksum_errors\($v | lbl) \(.)")),
+        (.scan_stats // {} | select(.function and .function != "NONE") |
+            {pool: $pool, function: .function} as $s |
+            "zfs_scan_state\($s + {state: .state} | lbl) 1",
+            "zfs_scan_start_timestamp_seconds\($s | lbl) \(.start_time)",
+            "zfs_scan_repaired_bytes\($s | lbl) \(.processed)",
+            "zfs_scan_errors\($s | lbl) \(.errors)",
+            (select(.state == "FINISHED") |
+                "zfs_scan_end_timestamp_seconds\($s | lbl) \(.end_time)"),
+            # Same progress zpool status prints: done once its I/O is issued.
+            (select(.state == "SCANNING") |
+                (.to_examine - .skipped) as $total |
+                (select($total > 0) |
+                    "zfs_scan_progress_ratio\($s | lbl) \([.issued / $total, 1] | min)"),
+                "zfs_scan_paused\($s | lbl) \(if (.scrub_pause // 0) > 0 then 1 else 0 end)"))
+    '
+    /usr/sbin/zpool list -Hp -o name,size,alloc,free,frag,cap |
+        while IFS=$'\t' read -r name size alloc free frag cap; do
+            name=$(label_escape "$name")
+            echo "zfs_pool_size_bytes{pool=\"$name\"} $size"
+            echo "zfs_pool_allocated_bytes{pool=\"$name\"} $alloc"
+            echo "zfs_pool_free_bytes{pool=\"$name\"} $free"
+            echo "zfs_pool_capacity_percent{pool=\"$name\"} $cap"
+            # "-" when the pool has no spacemap histogram yet.
+            if [[ $frag =~ ^[0-9]+$ ]]; then
+                echo "zfs_pool_fragmentation_percent{pool=\"$name\"} $frag"
+            fi
+        done
+    echo "host_metrics_timestamp_seconds{collector=\"zfs\"} $EPOCHSECONDS"
+}
+
+units_collector() {
+    local failed unit
+    failed=$(systemctl list-units --state=failed --plain --no-legend --full | cut -d' ' -f1)
+    for unit in $failed; do
+        echo "host_systemd_unit_failed{unit=\"$(label_escape "$unit")\"} 1"
+    done
+    echo "host_systemd_failed_units $(wc -w <<< "$failed")"
+    echo "host_metrics_timestamp_seconds{collector=\"units\"} $EPOCHSECONDS"
+}
+
+smart_collector() {
+    local name type device json
+    while IFS=$'\t' read -r name type; do
+        device=${name#/dev/}
+        # Exits non-zero for a disk in standby and for any warning it reports,
+        # such as a failing attribute, so the JSON decides what to record.
+        json=$(/usr/sbin/smartctl -j -a -n standby -d "$type" "$name") || true
+        jq -r --arg device "$device" --arg type "$type" "$jq_defs"'
+            {device: $device} as $d |
+            if (.smartctl.messages // [] | any(.string | test("STANDBY|SLEEP"))) then
+                "smart_device_standby\($d | lbl) 1"
+            elif (has("smart_status") | not) then
+                "smart_device_readable\($d | lbl) 0"
+            else
+                "smart_device_standby\($d | lbl) 0",
+                "smart_device_readable\($d | lbl) 1",
+                "smart_device_info\($d + {
+                    type: $type,
+                    protocol: (.device.protocol // ""),
+                    model: (.model_name // ""),
+                    serial: (.serial_number // ""),
+                    rotation_rate: (.rotation_rate // 0)
+                } | lbl) 1",
+                (.user_capacity.bytes // empty | "smart_capacity_bytes\($d | lbl) \(.)"),
+                "smart_status_passed\($d | lbl) \(if .smart_status.passed then 1 else 0 end)",
+                (.temperature.current // empty | "smart_temperature_celsius\($d | lbl) \(.)"),
+                (.power_on_time.hours // empty | "smart_power_on_hours\($d | lbl) \(.)"),
+                (.power_cycle_count // empty | "smart_power_cycles\($d | lbl) \(.)"),
+                (.ata_smart_attributes.table // [] | .[] |
+                    ($d + {id: .id, name: .name}) as $a |
+                    "smart_ata_attribute_raw\($a | lbl) \(.raw.value)",
+                    "smart_ata_attribute_value\($a | lbl) \(.value)",
+                    "smart_ata_attribute_worst\($a | lbl) \(.worst)",
+                    "smart_ata_attribute_threshold\($a | lbl) \(.thresh)",
+                    "smart_ata_attribute_failing\($a | lbl) \(if (.when_failed // "") != "" then 1 else 0 end)"),
+                (.ata_smart_error_log.summary.count // empty |
+                    "smart_ata_error_log_count\($d | lbl) \(.)"),
+                (.ata_smart_self_test_log.standard.table // [] | first // empty |
+                    ($d + {test: .type.string}) as $t |
+                    "smart_self_test_last_passed\($t | lbl) \(if .status.passed then 1 else 0 end)",
+                    "smart_self_test_last_lifetime_hours\($t | lbl) \(.lifetime_hours)"),
+                (.nvme_smart_health_information_log // {} | to_entries[] |
+                    select(.value | type == "number") |
+                    "smart_nvme_\(.key)\($d | lbl) \(.value)")
+            end
+        ' <<< "$json" || echo "smart_device_readable{device=\"$(label_escape "$device")\"} 0"
+    done < <(/usr/sbin/smartctl --scan -j | jq -r '.devices // [] | .[] | [.name, .type] | @tsv')
+    echo "host_metrics_timestamp_seconds{collector=\"smart\"} $EPOCHSECONDS"
+}
+
+bootc_collector() {
+    local json slot stamp
+    json=$(bootc status --format json)
+    jq -r "$jq_defs"'
+        .status as $s |
+        ($s.booted.image // {}) as $b |
+        "bootc_booted_info\({
+            image: ($b.image.image // ""),
+            version: ($b.version // ""),
+            digest: ($b.imageDigest // "")
+        } | lbl) 1",
+        "bootc_staged \(if $s.staged then 1 else 0 end)",
+        "bootc_cached_update \(if $s.booted.cachedUpdate then 1 else 0 end)",
+        "bootc_rollback_queued \(if $s.rollbackQueued then 1 else 0 end)"
+    ' <<< "$json"
+    # Build times are RFC 3339, which jq only parses without fractions.
+    for slot in booted staged; do
+        stamp=$(jq -r --arg slot "$slot" '.status[$slot].image.timestamp // empty' <<< "$json")
+        if [ -n "$stamp" ]; then
+            echo "bootc_image_timestamp_seconds{slot=\"$slot\"} $(date -d "$stamp" +%s)"
+        fi
+    done
+    echo "host_metrics_timestamp_seconds{collector=\"bootc\"} $EPOCHSECONDS"
+}
+
+collector=${1:?usage: host-metrics zfs|units|smart|bootc}
+case $collector in
+    zfs | units | smart | bootc) write "$textfile_dir/host-$collector.prom" "${collector}_collector" ;;
+    *) echo "unknown collector: $collector" >&2; exit 2 ;;
+esac

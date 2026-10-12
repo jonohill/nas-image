@@ -1,0 +1,35 @@
+{
+  "smartctl": {
+    "exit_status": 0
+  },
+  "device": {
+    "name": "/dev/nvme0",
+    "type": "nvme",
+    "protocol": "NVMe"
+  },
+  "model_name": "Samsung SSD 970",
+  "serial_number": "S4",
+  "smart_status": {
+    "passed": true
+  },
+  "nvme_smart_health_information_log": {
+    "critical_warning": 0,
+    "temperature": 41,
+    "available_spare": 100,
+    "available_spare_threshold": 10,
+    "percentage_used": 3,
+    "data_units_written": 123456,
+    "media_errors": 0,
+    "temperature_sensors": [
+      41,
+      45
+    ]
+  },
+  "temperature": {
+    "current": 41
+  },
+  "power_on_time": {
+    "hours": 9000
+  },
+  "power_cycle_count": 50
+}

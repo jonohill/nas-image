@@ -1,0 +1,4 @@
+host_systemd_unit_failed{unit="greenboot-healthcheck.service"} 1
+host_systemd_unit_failed{unit="zfs-scrub@tank.service"} 1
+host_systemd_failed_units 2
+host_metrics_timestamp_seconds{collector="units"} 1791771775

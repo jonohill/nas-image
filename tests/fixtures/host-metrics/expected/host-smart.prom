@@ -1,0 +1,38 @@
+smart_device_standby{device="sda"} 0
+smart_device_readable{device="sda"} 1
+smart_device_info{device="sda",type="sat",protocol="ATA",model="WDC WD40EFRX",serial="WD-123",rotation_rate="5400"} 1
+smart_status_passed{device="sda"} 1
+smart_capacity_bytes{device="sda"} 4000787030016
+smart_temperature_celsius{device="sda"} 34
+smart_power_on_hours{device="sda"} 41000
+smart_power_cycles{device="sda"} 120
+smart_ata_error_log_count{device="sda"} 4
+smart_ata_attribute_raw{device="sda",id="5",name="Reallocated_Sector_Ct"} 0
+smart_ata_attribute_value{device="sda",id="5",name="Reallocated_Sector_Ct"} 200
+smart_ata_attribute_worst{device="sda",id="5",name="Reallocated_Sector_Ct"} 200
+smart_ata_attribute_threshold{device="sda",id="5",name="Reallocated_Sector_Ct"} 140
+smart_ata_attribute_failing{device="sda",id="5",name="Reallocated_Sector_Ct"} 0
+smart_ata_attribute_raw{device="sda",id="197",name="Current_Pending_Sector"} 2
+smart_ata_attribute_value{device="sda",id="197",name="Current_Pending_Sector"} 200
+smart_ata_attribute_worst{device="sda",id="197",name="Current_Pending_Sector"} 200
+smart_ata_attribute_threshold{device="sda",id="197",name="Current_Pending_Sector"} 0
+smart_ata_attribute_failing{device="sda",id="197",name="Current_Pending_Sector"} 1
+smart_self_test_last_passed{device="sda",test="Extended offline"} 1
+smart_self_test_last_lifetime_hours{device="sda",test="Extended offline"} 40000
+smart_device_standby{device="sdb"} 1
+smart_device_standby{device="nvme0"} 0
+smart_device_readable{device="nvme0"} 1
+smart_device_info{device="nvme0",type="nvme",protocol="NVMe",model="Samsung SSD 970",serial="S4",rotation_rate="0"} 1
+smart_status_passed{device="nvme0"} 1
+smart_temperature_celsius{device="nvme0"} 41
+smart_power_on_hours{device="nvme0"} 9000
+smart_power_cycles{device="nvme0"} 50
+smart_nvme_critical_warning{device="nvme0"} 0
+smart_nvme_temperature{device="nvme0"} 41
+smart_nvme_available_spare{device="nvme0"} 100
+smart_nvme_available_spare_threshold{device="nvme0"} 10
+smart_nvme_percentage_used{device="nvme0"} 3
+smart_nvme_data_units_written{device="nvme0"} 123456
+smart_nvme_media_errors{device="nvme0"} 0
+smart_device_readable{device="sdz"} 0
+host_metrics_timestamp_seconds{collector="smart"} 1791771775

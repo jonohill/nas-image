@@ -8,3 +8,4 @@ secrets/
 docs/
 host.pub
 CLAUDE.md
+__pycache__/

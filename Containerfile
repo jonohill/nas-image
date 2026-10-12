@@ -119,6 +119,12 @@ RUN chmod 0755 /usr/local/sbin/rustic-zfs-snap /usr/local/sbin/rustic-job \
         rustic-jotta.timer rustic-inventory.timer && \
     systemctl add-wants offpeak.target rustic-maintain-nas.service rustic-maintain-jotta.service
 
+# ZFS, SMART, failed unit and bootc metrics for the Server dashboard. The
+# --help run fails the build if the image's python3 cannot load the script.
+RUN chmod 0755 /usr/local/sbin/host-metrics && \
+    /usr/local/sbin/host-metrics --help > /dev/null && \
+    systemctl enable host-metrics.timer host-metrics-slow.timer
+
 # Logically bound images: quadlet images are pulled with the host image.
 RUN mkdir -p /usr/lib/bootc/bound-images.d && \
     find /usr/share/containers/systemd \

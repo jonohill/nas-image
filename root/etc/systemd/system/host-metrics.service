@@ -1,0 +1,11 @@
+[Unit]
+Description=Write ZFS and systemd health metrics for node_exporter
+After=zfs-import.target
+
+[Service]
+Type=oneshot
+Environment=TZ=Pacific/Auckland
+# A failed unit at boot triggers a greenboot rollback, and a missing metric
+# shows on the dashboard as a stale collector time.
+ExecStart=-/usr/local/sbin/host-metrics zfs
+ExecStart=-/usr/local/sbin/host-metrics units

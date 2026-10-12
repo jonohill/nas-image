@@ -1,0 +1,7 @@
+bootc_booted_info{image="ghcr.io/jonohill/nas-image:latest",version="10.0",digest="sha256:aaa"} 1
+bootc_staged 1
+bootc_cached_update 0
+bootc_rollback_queued 0
+bootc_image_timestamp_seconds{slot="booted"} 1791162123
+bootc_image_timestamp_seconds{slot="staged"} 1791766923
+host_metrics_timestamp_seconds{collector="bootc"} 1791771775

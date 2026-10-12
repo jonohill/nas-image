@@ -1,0 +1,10 @@
+[Unit]
+Description=Collect ZFS and systemd health metrics every 5 minutes
+
+[Timer]
+# Both reads come from memory and take milliseconds. Runs on the same minutes
+# as host-metrics-slow.timer so the wakeups coincide.
+OnCalendar=*:0/5
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,35 @@
+[Unit]
+Description=Matter server for Home Assistant
+Requires=zfs-ssd.service
+After=zfs-ssd.service network-online.target
+Wants=network-online.target
+# A failed unit at boot triggers a greenboot rollback, so keep restarting
+# rather than parking the unit as failed.
+StartLimitIntervalSec=0
+
+[Container]
+Image=ghcr.io/matter-js/matterjs-server:1.5.5
+GlobalArgs=--storage-opt=additionalimagestore=/usr/lib/bootc/storage
+# Image is logically bound, so bootc keeps it in the additional store above
+Pull=never
+ContainerName=matterjs-server
+# Matter needs IPv6 link-local and mDNS on the LAN interface.
+Network=host
+Environment=TZ=Pacific/Auckland
+# Only Home Assistant, also on the host network, talks to the WebSocket API.
+Environment=LISTEN_ADDRESS=127.0.0.1
+# V8 otherwise defers GC until the heap nears ~2 GB, competing with the ARC.
+Environment=NODE_OPTIONS=--max-old-space-size=512
+ReadOnly=true
+# Holds the fabric root CA and device keys. Losing it means re-commissioning
+# every device.
+Volume=/var/mnt/ssd/data/matterjs-server:/data:Z
+
+[Service]
+Restart=always
+RestartSec=30
+# The image runs as UID 1000.
+ExecStartPre=/usr/bin/install -d -o 1000 -g 1000 /var/mnt/ssd/data/matterjs-server
+
+[Install]
+WantedBy=multi-user.target

@@ -47,7 +47,11 @@ url="$base_url/$fingerprint/secrets"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
-curl -fsSL "$url" -o "$tmp_dir/secrets.age"
+# network-online.target can be reached before DHCP has supplied a resolver,
+# for example when IPv6 link-local alone activates the connection. Dependants
+# order after this unit, so retry here rather than fail the boot.
+curl -fsSL --retry 60 --retry-delay 2 --retry-max-time 180 --retry-all-errors \
+    "$url" -o "$tmp_dir/secrets.age"
 
 # Decrypt the blob to a tar.gz, then unpack it into /run.
 age --decrypt --identity "$HOST_KEY_PATH" \

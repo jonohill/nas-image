@@ -11,6 +11,11 @@ targets:
   - hosts: [1.1.1.1, 8.8.8.8]
     protocol: udp
     labels: {hop: internet, family: ipv4}
+  # hil-speed and sin-speed.hetzner.com. Addresses because the prober exits
+  # if a name fails to resolve at startup.
+  - hosts: [5.78.7.195, 5.223.7.195]
+    protocol: udp
+    labels: {hop: overseas, family: ipv4}
   - hosts: ["2606:4700:4700::1111", "2001:4860:4860::8888"]
     protocol: udp
     labels: {hop: internet, family: ipv6}

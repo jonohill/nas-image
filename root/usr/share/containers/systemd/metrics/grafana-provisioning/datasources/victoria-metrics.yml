@@ -8,5 +8,6 @@ datasources:
     url: http://127.0.0.1:8428
     isDefault: true
     jsonData:
-      # Matches scrape.yml, so $__rate_interval spans at least two samples.
+      # Matches scrape.yml's default, so $__rate_interval spans at least two
+      # samples. Queries on 15 s jobs set a 15s Min step to override it.
       timeInterval: 60s

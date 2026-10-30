@@ -3,6 +3,8 @@ global:
 
 scrape_configs:
   - job_name: edgerouter
+    # Resolves link load finely enough to compare with probe latency.
+    scrape_interval: 15s
     metrics_path: /snmp
     params:
       # The auth is defined in /run/snmp-exporter/auth.yml from secrets.
@@ -27,6 +29,114 @@ scrape_configs:
     metric_relabel_configs:
       - regex: source|tos
         action: labeldrop
+
+  # blackbox_exporter runs one probe per scrape, so the interval is the
+  # resolution. hop: internet is anycast or a CDN's Auckland edge, nz an NZ
+  # origin, au AWS Sydney, overseas reached over international transit.
+  # Probes resolve names through the host, so DNS failures fail them too.
+  - job_name: dns
+    scrape_interval: 15s
+    metrics_path: /probe
+    static_configs:
+      - targets: [192.168.4.1]
+        labels: {module: dns_udp, hop: lan}
+      - targets: [1.1.1.1, 8.8.8.8]
+        labels: {module: dns_udp, hop: internet}
+      - targets: [1.1.1.1, 8.8.8.8]
+        labels: {module: dns_tcp, hop: internet}
+    relabel_configs: &blackbox
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - source_labels: [module]
+        target_label: __param_module
+      - target_label: __address__
+        replacement: 127.0.0.1:9115
+
+  # Handshake only, so a failure is the TCP path or the router's conntrack.
+  - job_name: tcp
+    scrape_interval: 15s
+    metrics_path: /probe
+    static_configs:
+      # Google, Fastly and Akamai
+      - targets: [www.google.com:443, www.rnz.co.nz:443, www.kiwibank.co.nz:443]
+        labels: {module: tcp_connect, hop: internet}
+      # 1news on two Akamai networks and CloudFront, Slack's emoji on CloudFront
+      - targets:
+          - www.1news.co.nz:443
+          - tvnz-1-news-prod.cdn.arcpublishing.com:443
+          - cf-images.ap-southeast-2.prod.boltdns.net:443
+          - a.slack-edge.com:443
+        labels: {module: tcp_connect, hop: internet}
+      # ecosia.com is AWS Frankfurt and redirects to www.ecosia.org on Cloudflare
+      - targets: [ecosia.com:443]
+        labels: {module: tcp_connect, hop: overseas}
+      - targets: [www.ecosia.org:443]
+        labels: {module: tcp_connect, hop: internet}
+      # Catalyst Cloud and Victoria University's own network
+      - targets: [catalystcloud.nz:443, www.vuw.ac.nz:443]
+        labels: {module: tcp_connect, hop: nz}
+      - targets: [dynamodb.ap-southeast-2.amazonaws.com:443]
+        labels: {module: tcp_connect, hop: au}
+      # Hetzner in Hillsboro, Oregon and Singapore
+      - targets: [hil-speed.hetzner.com:443, sin-speed.hetzner.com:443]
+        labels: {module: tcp_connect, hop: overseas}
+    relabel_configs: *blackbox
+
+  # Full-size versions of the pings in smokeping.yml
+  - job_name: icmp
+    scrape_interval: 15s
+    metrics_path: /probe
+    static_configs:
+      - targets: [192.168.4.1]
+        labels: {module: icmp_1500, hop: lan}
+      - targets: [1.1.1.1]
+        labels: {module: icmp_1500, hop: internet}
+      - targets: [hil-speed.hetzner.com, sin-speed.hetzner.com]
+        labels: {module: icmp_1500, hop: overseas}
+    relabel_configs: *blackbox
+
+  # 60 s keeps all probes to about 15 GB a month, mostly these.
+  - job_name: https
+    scrape_interval: 60s
+    scrape_timeout: 20s
+    metrics_path: /probe
+    static_configs:
+      - targets:
+          - https://www.google.com/generate_204
+          - https://www.rnz.co.nz/robots.txt
+          - https://www.kiwibank.co.nz/robots.txt
+          - https://captive.apple.com/hotspot-detect.html
+        labels: {module: https, hop: internet}
+      # aws.amazon.com stands in for 1news's CloudFront host, whose paths
+      # change per article.
+      - targets:
+          - https://www.1news.co.nz/robots.txt
+          - https://tvnz-1-news-prod.cdn.arcpublishing.com/robots.txt
+          - https://aws.amazon.com/favicon.ico
+          - https://a.slack-edge.com/production-standard-emoji-assets/16.0/apple-large/1f914@2x.png
+          - https://www.ecosia.org/robots.txt
+        labels: {module: https, hop: internet}
+      - targets: [https://ecosia.com/]
+        labels: {module: https, hop: overseas}
+      - targets:
+          - https://catalystcloud.nz/robots.txt
+          - https://www.vuw.ac.nz/
+        labels: {module: https, hop: nz}
+      - targets: [https://dynamodb.ap-southeast-2.amazonaws.com/ping]
+        labels: {module: https, hop: au}
+      - targets: ["https://speed.cloudflare.com/__down?bytes=32768"]
+        labels: {module: download, hop: internet}
+      - targets:
+          - https://hil-speed.hetzner.com/100MB.bin
+          - https://sin-speed.hetzner.com/100MB.bin
+        labels: {module: download, hop: overseas}
+      - targets:
+          - https://www.google.com/generate_204
+          - https://cloudflare-quic.com/robots.txt
+        labels: {module: http3, hop: internet}
+    relabel_configs: *blackbox
 
   - job_name: node
     # Keeps the job label that rustic-job and rustic-inventory set on their

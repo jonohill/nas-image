@@ -87,6 +87,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "hrSystemUptime{job=\"edgerouter\"} / 100",
+          "interval": "15s",
           "legendFormat": "Uptime",
           "refId": "A"
         }
@@ -144,6 +145,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "100 - rate(ssCpuRawIdle{job=\"edgerouter\"}[$__rate_interval]) / ssCpuNumCpus{job=\"edgerouter\"}",
+          "interval": "15s",
           "legendFormat": "CPU busy",
           "refId": "A"
         }
@@ -209,6 +211,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "(memTotalReal{job=\"edgerouter\"} - memAvailReal{job=\"edgerouter\"} - memBuffer{job=\"edgerouter\"} - memCached{job=\"edgerouter\"}) / memTotalReal{job=\"edgerouter\"} * 100",
+          "interval": "15s",
           "legendFormat": "Memory used",
           "refId": "A"
         }
@@ -274,6 +277,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "laLoadFloat{job=\"edgerouter\", laNames=\"Load-1\"}",
+          "interval": "15s",
           "legendFormat": "Load (1 min)",
           "refId": "A"
         }
@@ -331,6 +335,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ifHCInOctets{job=\"edgerouter\", ifName=\"$wan\"}[$__rate_interval]) * 8",
+          "interval": "15s",
           "legendFormat": "Internet down",
           "refId": "A"
         }
@@ -388,6 +393,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ifHCOutOctets{job=\"edgerouter\", ifName=\"$wan\"}[$__rate_interval]) * 8",
+          "interval": "15s",
           "legendFormat": "Internet up",
           "refId": "A"
         }
@@ -445,6 +451,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ifHCInOctets{job=\"edgerouter\", ifName=\"$wan\"}[$__rate_interval]) * 8",
+          "interval": "15s",
           "legendFormat": "Download",
           "refId": "A"
         },
@@ -454,6 +461,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ifHCOutOctets{job=\"edgerouter\", ifName=\"$wan\"}[$__rate_interval]) * 8",
+          "interval": "15s",
           "legendFormat": "Upload",
           "refId": "B"
         }
@@ -513,7 +521,6 @@
         "x": 0,
         "y": 13
       },
-      "interval": "15s",
       "targets": [
         {
           "datasource": {
@@ -521,6 +528,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "clamp_min(increase(smokeping_requests_total{job=\"internet\"}[$__interval]) - increase(smokeping_response_duration_seconds_count{job=\"internet\"}[$__interval]), 0) > 1",
+          "interval": "15s",
           "legendFormat": "{{hop}} {{host}}",
           "refId": "A"
         }
@@ -570,7 +578,6 @@
         "x": 12,
         "y": 13
       },
-      "interval": "15s",
       "targets": [
         {
           "datasource": {
@@ -578,6 +585,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(smokeping_response_duration_seconds_sum{job=\"internet\"}[$__rate_interval]) / rate(smokeping_response_duration_seconds_count{job=\"internet\"}[$__rate_interval])",
+          "interval": "15s",
           "legendFormat": "{{hop}} {{host}}",
           "refId": "A"
         }
@@ -634,6 +642,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ifHCInOctets{job=\"edgerouter\", ifName=~\"$interface\"}[$__rate_interval]) * 8",
+          "interval": "15s",
           "legendFormat": "{{ifName}} {{ifAlias}}",
           "refId": "A"
         }
@@ -686,6 +695,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ifHCOutOctets{job=\"edgerouter\", ifName=~\"$interface\"}[$__rate_interval]) * 8",
+          "interval": "15s",
           "legendFormat": "{{ifName}} {{ifAlias}}",
           "refId": "A"
         }
@@ -738,6 +748,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ssCpuRawUser{job=\"edgerouter\"}[$__rate_interval]) / ssCpuNumCpus{job=\"edgerouter\"}",
+          "interval": "15s",
           "legendFormat": "User",
           "refId": "A"
         },
@@ -747,6 +758,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ssCpuRawNice{job=\"edgerouter\"}[$__rate_interval]) / ssCpuNumCpus{job=\"edgerouter\"}",
+          "interval": "15s",
           "legendFormat": "Nice",
           "refId": "B"
         },
@@ -756,6 +768,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ssCpuRawSystem{job=\"edgerouter\"}[$__rate_interval]) / ssCpuNumCpus{job=\"edgerouter\"}",
+          "interval": "15s",
           "legendFormat": "System",
           "refId": "C"
         },
@@ -765,6 +778,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ssCpuRawSoftIRQ{job=\"edgerouter\"}[$__rate_interval]) / ssCpuNumCpus{job=\"edgerouter\"}",
+          "interval": "15s",
           "legendFormat": "SoftIRQ",
           "refId": "D"
         },
@@ -774,6 +788,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ssCpuRawInterrupt{job=\"edgerouter\"}[$__rate_interval]) / ssCpuNumCpus{job=\"edgerouter\"}",
+          "interval": "15s",
           "legendFormat": "Interrupt",
           "refId": "E"
         },
@@ -783,6 +798,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ssCpuRawWait{job=\"edgerouter\"}[$__rate_interval]) / ssCpuNumCpus{job=\"edgerouter\"}",
+          "interval": "15s",
           "legendFormat": "Wait",
           "refId": "F"
         },
@@ -792,6 +808,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ssCpuRawSteal{job=\"edgerouter\"}[$__rate_interval]) / ssCpuNumCpus{job=\"edgerouter\"}",
+          "interval": "15s",
           "legendFormat": "Steal",
           "refId": "G"
         }
@@ -845,6 +862,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "(memTotalReal{job=\"edgerouter\"} - memAvailReal{job=\"edgerouter\"} - memBuffer{job=\"edgerouter\"} - memCached{job=\"edgerouter\"}) * 1024",
+          "interval": "15s",
           "legendFormat": "Used",
           "refId": "A"
         },
@@ -854,6 +872,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "memBuffer{job=\"edgerouter\"} * 1024",
+          "interval": "15s",
           "legendFormat": "Buffers",
           "refId": "B"
         },
@@ -863,6 +882,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "memCached{job=\"edgerouter\"} * 1024",
+          "interval": "15s",
           "legendFormat": "Cached",
           "refId": "C"
         },
@@ -872,6 +892,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "memAvailReal{job=\"edgerouter\"} * 1024",
+          "interval": "15s",
           "legendFormat": "Free",
           "refId": "D"
         }
@@ -925,6 +946,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "laLoadFloat{job=\"edgerouter\"}",
+          "interval": "15s",
           "legendFormat": "{{laNames}}",
           "refId": "A"
         }
@@ -978,6 +1000,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ifInErrors{job=\"edgerouter\", ifName=~\"$interface\"}[$__rate_interval]) > 0",
+          "interval": "15s",
           "legendFormat": "{{ifName}} in errors",
           "refId": "A"
         },
@@ -987,6 +1010,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ifOutErrors{job=\"edgerouter\", ifName=~\"$interface\"}[$__rate_interval]) > 0",
+          "interval": "15s",
           "legendFormat": "{{ifName}} out errors",
           "refId": "B"
         },
@@ -996,6 +1020,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ifInDiscards{job=\"edgerouter\", ifName=~\"$interface\"}[$__rate_interval]) > 0",
+          "interval": "15s",
           "legendFormat": "{{ifName}} in discards",
           "refId": "C"
         },
@@ -1005,6 +1030,7 @@
             "uid": "victoria-metrics"
           },
           "expr": "rate(ifOutDiscards{job=\"edgerouter\", ifName=~\"$interface\"}[$__rate_interval]) > 0",
+          "interval": "15s",
           "legendFormat": "{{ifName}} out discards",
           "refId": "D"
         }

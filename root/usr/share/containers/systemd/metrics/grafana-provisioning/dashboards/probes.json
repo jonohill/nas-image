@@ -1,0 +1,558 @@
+{
+  "uid": "probes",
+  "title": "Internet probes",
+  "tags": [
+    "blackbox"
+  ],
+  "timezone": "browser",
+  "editable": false,
+  "refresh": "",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "schemaVersion": 39,
+  "templating": {
+    "list": [
+      {
+        "name": "wan",
+        "label": "Internet interface",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "victoria-metrics"
+        },
+        "query": {
+          "query": "label_values(ifHCInOctets{job=\"edgerouter\"}, ifName)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "definition": "label_values(ifHCInOctets{job=\"edgerouter\"}, ifName)",
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "text": "eth0.10",
+          "value": "eth0.10"
+        },
+        "options": []
+      },
+      {
+        "name": "down_mbps",
+        "label": "Plan download (Mbit/s)",
+        "type": "constant",
+        "hide": 2,
+        "query": "500",
+        "current": {
+          "text": "500",
+          "value": "500"
+        },
+        "options": [
+          {
+            "text": "500",
+            "value": "500",
+            "selected": true
+          }
+        ]
+      },
+      {
+        "name": "up_mbps",
+        "label": "Plan upload (Mbit/s)",
+        "type": "constant",
+        "hide": 2,
+        "query": "100",
+        "current": {
+          "text": "100",
+          "value": "100"
+        },
+        "options": [
+          {
+            "text": "100",
+            "value": "100",
+            "selected": true
+          }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "state-timeline",
+      "title": "Probe results",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "description": "One row per probe, red where it failed. A failure on every row means the NAS or LAN. Failures on one hop or one module point at that path or protocol: dns through the router but not direct is the router's resolver or the ISP's, tcp but not icmp is connection tracking, icmp_1500 or download alone is an MTU black hole, http3 alone is UDP 443. DNS failures also fail the other probes, which look names up through the router. Each row shows the worst result in its time slot, so a single failure stays visible when zoomed out.",
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "interval": "15s",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "min_over_time(probe_success{job=~\"dns|tcp|icmp|https\"})",
+          "legendFormat": "{{module}} {{instance}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showValue": "never",
+        "mergeValues": true,
+        "rowHeight": 0.8,
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Failed",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0
+          }
+        },
+        "overrides": []
+      },
+      "id": 1
+    },
+    {
+      "type": "timeseries",
+      "title": "Link load and latency",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "description": "WAN traffic as a share of the plan's speed, the router's CPU, and mean ping to the nearest internet targets. Latency rising while download or upload is near 100% is your own traffic queueing (bufferbloat). Latency rising or probes failing while the link is quiet is upstream. Router CPU near 100% under load means the router itself is the bottleneck, as with Smart Queue, which turns off hardware offload. Each point averages its time slot, so zoom in to see short bursts.",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "interval": "15s",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "100 * rate(ifHCInOctets{job=\"edgerouter\", ifName=\"$wan\"}[$__interval]) * 8 / ($down_mbps * 1e6)",
+          "legendFormat": "Download",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "100 * rate(ifHCOutOctets{job=\"edgerouter\", ifName=\"$wan\"}[$__interval]) * 8 / ($up_mbps * 1e6)",
+          "legendFormat": "Upload",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "100 - rate(ssCpuRawIdle{job=\"edgerouter\"}[$__interval]) / ssCpuNumCpus{job=\"edgerouter\"}",
+          "legendFormat": "Router CPU",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "avg(rate(smokeping_response_duration_seconds_sum{job=\"internet\", hop=\"internet\", family=\"ipv4\"}[$__interval]) / rate(smokeping_response_duration_seconds_count{job=\"internet\", hop=\"internet\", family=\"ipv4\"}[$__interval]))",
+          "legendFormat": "Ping to 1.1.1.1 and 8.8.8.8",
+          "refId": "D"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "custom": {
+            "axisSoftMax": 100,
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ping to 1.1.1.1 and 8.8.8.8"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisSoftMax",
+                "value": null
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "id": 7
+    },
+    {
+      "type": "timeseries",
+      "title": "DNS lookup time",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "description": "Time for one A query, through the router (lan) and direct to public resolvers over UDP and TCP. A failed query shows the time until it gave up.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 25
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "probe_duration_seconds{job=\"dns\"}",
+          "legendFormat": "{{module}} {{instance}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "log",
+              "log": 10
+            }
+          }
+        },
+        "overrides": []
+      },
+      "id": 2
+    },
+    {
+      "type": "timeseries",
+      "title": "TCP connect time",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "description": "Handshake time to port 443, without the name lookup. Roughly one round trip, so it tracks ping unless the router or a middlebox delays new connections.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 25
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "probe_duration_seconds{job=\"tcp\"} - probe_dns_lookup_time_seconds{job=\"tcp\"}",
+          "legendFormat": "{{hop}} {{instance}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "log",
+              "log": 10
+            }
+          }
+        },
+        "overrides": []
+      },
+      "id": 3
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTPS fetch time",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "description": "Whole fetch, including the name lookup, once a minute. download fetches 32 KiB, http3 runs over QUIC.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 33
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "probe_duration_seconds{job=\"https\"}",
+          "legendFormat": "{{module}} {{instance}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "log",
+              "log": 10
+            }
+          }
+        },
+        "overrides": []
+      },
+      "id": 4
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTPS time by phase",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "description": "Slowest target in each phase: resolve is the name lookup, connect the TCP handshake, tls the TLS handshake, processing the wait for the first byte and transfer the rest of the body.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 33
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "max by (phase) (probe_http_duration_seconds{job=\"https\"})",
+          "legendFormat": "{{phase}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "log",
+              "log": 10
+            }
+          }
+        },
+        "overrides": []
+      },
+      "id": 5
+    },
+    {
+      "type": "timeseries",
+      "title": "Full-size ping round-trip time",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "description": "1500-byte pings with don't fragment set. Compare with the small pings on the EdgeRouter dashboard: small pings answered and these lost means a hop on that path drops full-size packets.",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "probe_icmp_duration_seconds{job=\"icmp\", phase=\"rtt\"}",
+          "legendFormat": "{{hop}} {{instance}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "log",
+              "log": 10
+            }
+          }
+        },
+        "overrides": []
+      },
+      "id": 6
+    }
+  ]
+}

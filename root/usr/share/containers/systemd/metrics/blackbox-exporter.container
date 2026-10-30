@@ -1,0 +1,31 @@
+[Unit]
+Description=Prometheus blackbox exporter
+After=network-online.target
+Wants=network-online.target
+# A failed unit at boot triggers a greenboot rollback, so keep restarting
+# rather than parking the unit as failed.
+StartLimitIntervalSec=0
+
+[Container]
+Image=quay.io/prometheus/blackbox-exporter:v0.29.1
+GlobalArgs=--storage-opt=additionalimagestore=/usr/lib/bootc/storage
+# Image is logically bound, so bootc keeps it in the additional store above
+Pull=never
+ContainerName=blackbox-exporter
+# VictoriaMetrics scrapes it on loopback. The host's ping_group_range covers
+# nobody, and probes use the host's resolver.
+Network=host
+User=65534
+Group=65534
+DropCapability=all
+Environment=TZ=Pacific/Auckland GOMAXPROCS=1
+Volume=/usr/share/containers/systemd/metrics/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+SecurityLabelDisable=true
+Exec=--config.file=/etc/blackbox_exporter/config.yml --web.listen-address=127.0.0.1:9115
+
+[Service]
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

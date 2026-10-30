@@ -105,7 +105,7 @@ scrape_configs:
         labels: {module: icmp_1500, hop: overseas}
     relabel_configs: *blackbox
 
-  # Fetches are less frequent to keep the traffic down: about 10 GB a month
+  # Fetches are less frequent to keep the traffic down: about 15 GB a month
   # across all the probes, mostly these.
   - job_name: https
     scrape_interval: 60s

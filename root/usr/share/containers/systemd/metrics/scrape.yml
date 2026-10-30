@@ -75,9 +75,12 @@ scrape_configs:
           - a.slack-edge.com:443
         labels: {module: tcp_connect, hop: internet}
       # ecosia.com is a load balancer in AWS Frankfurt that redirects to
-      # www.ecosia.org on Cloudflare.
+      # www.ecosia.org on Cloudflare, so each half is probed. www.ecosia.org
+      # is also this job's only Cloudflare target.
       - targets: [ecosia.com:443]
         labels: {module: tcp_connect, hop: overseas}
+      - targets: [www.ecosia.org:443]
+        labels: {module: tcp_connect, hop: internet}
       # Catalyst Cloud and Victoria University's own network
       - targets: [catalystcloud.nz:443, www.vuw.ac.nz:443]
         labels: {module: tcp_connect, hop: nz}
@@ -123,6 +126,7 @@ scrape_configs:
           - https://tvnz-1-news-prod.cdn.arcpublishing.com/robots.txt
           - https://aws.amazon.com/favicon.ico
           - https://a.slack-edge.com/production-standard-emoji-assets/16.0/apple-large/1f914@2x.png
+          - https://www.ecosia.org/robots.txt
         labels: {module: https, hop: internet}
       - targets: [https://ecosia.com/]
         labels: {module: https, hop: overseas}

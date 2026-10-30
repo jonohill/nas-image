@@ -52,6 +52,9 @@ modules:
       ip_protocol_fallback: false
       fail_if_not_ssl: true
       follow_redirects: false
+      # Cloudflare's bot challenge 403s www.ecosia.org without it
+      headers:
+        Accept: '*/*'
       valid_status_codes: [200, 204, 301]
 
   # 32 KiB spans enough full-size segments to hit an MTU black hole.

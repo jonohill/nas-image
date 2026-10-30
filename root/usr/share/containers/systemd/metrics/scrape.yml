@@ -67,10 +67,12 @@ scrape_configs:
       # Sites that failed in the 2026-10-30 outage while others worked. 1news
       # pages and images are on two Akamai networks and its video thumbnails
       # on CloudFront, whose files are all per article, so only TCP here.
+      # Slack's emoji, which also misbehaved, are on CloudFront too.
       - targets:
           - www.1news.co.nz:443
           - tvnz-1-news-prod.cdn.arcpublishing.com:443
           - cf-images.ap-southeast-2.prod.boltdns.net:443
+          - a.slack-edge.com:443
         labels: {module: tcp_connect, hop: internet}
       # ecosia.com is a load balancer in AWS Frankfurt that redirects to
       # www.ecosia.org on Cloudflare.
@@ -114,11 +116,13 @@ scrape_configs:
           - https://captive.apple.com/hotspot-detect.html
         labels: {module: https, hop: internet}
       # The outage sites as in the tcp job. aws.amazon.com stands in for
-      # CloudFront.
+      # 1news's CloudFront host. The emoji's path carries its version, so it
+      # stays put.
       - targets:
           - https://www.1news.co.nz/robots.txt
           - https://tvnz-1-news-prod.cdn.arcpublishing.com/robots.txt
           - https://aws.amazon.com/favicon.ico
+          - https://a.slack-edge.com/production-standard-emoji-assets/16.0/apple-large/1f914@2x.png
         labels: {module: https, hop: internet}
       - targets: [https://ecosia.com/]
         labels: {module: https, hop: overseas}

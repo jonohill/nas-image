@@ -64,6 +64,18 @@ scrape_configs:
       # Google, Fastly and Akamai
       - targets: [www.google.com:443, www.rnz.co.nz:443, www.kiwibank.co.nz:443]
         labels: {module: tcp_connect, hop: internet}
+      # Sites that failed in the 2026-10-30 outage while others worked. 1news
+      # pages and images are on two Akamai networks and its video thumbnails
+      # on CloudFront, whose files are all per article, so only TCP here.
+      - targets:
+          - www.1news.co.nz:443
+          - tvnz-1-news-prod.cdn.arcpublishing.com:443
+          - cf-images.ap-southeast-2.prod.boltdns.net:443
+        labels: {module: tcp_connect, hop: internet}
+      # ecosia.com is a load balancer in AWS Frankfurt that redirects to
+      # www.ecosia.org on Cloudflare.
+      - targets: [ecosia.com:443]
+        labels: {module: tcp_connect, hop: overseas}
       # Catalyst Cloud and Victoria University's own network
       - targets: [catalystcloud.nz:443, www.vuw.ac.nz:443]
         labels: {module: tcp_connect, hop: nz}
@@ -101,6 +113,15 @@ scrape_configs:
           - https://www.kiwibank.co.nz/robots.txt
           - https://captive.apple.com/hotspot-detect.html
         labels: {module: https, hop: internet}
+      # The outage sites as in the tcp job. aws.amazon.com stands in for
+      # CloudFront.
+      - targets:
+          - https://www.1news.co.nz/robots.txt
+          - https://tvnz-1-news-prod.cdn.arcpublishing.com/robots.txt
+          - https://aws.amazon.com/favicon.ico
+        labels: {module: https, hop: internet}
+      - targets: [https://ecosia.com/]
+        labels: {module: https, hop: overseas}
       - targets:
           - https://catalystcloud.nz/robots.txt
           - https://www.vuw.ac.nz/

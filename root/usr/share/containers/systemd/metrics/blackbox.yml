@@ -1,0 +1,86 @@
+# Probes that ping can't stand in for: DNS lookups, TCP handshakes through the
+# router's NAT, HTTPS and QUIC fetches, and full-size packets. Targets and
+# intervals are in scrape.yml. IPv6 is off upstream, so every module is IPv4
+# only rather than trying IPv6 first.
+modules:
+  # The query name's 5 s TTL keeps the router's cache from answering most
+  # probes, so a probe through the router exercises its upstream resolver too.
+  dns_udp:
+    prober: dns
+    timeout: 5s
+    dns:
+      transport_protocol: udp
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      query_name: dynamodb.ap-southeast-2.amazonaws.com
+      query_type: A
+      validate_answer_rrs:
+        fail_if_none_matches_regexp: ['\tIN\tA\t']
+  dns_tcp:
+    prober: dns
+    timeout: 5s
+    dns:
+      transport_protocol: tcp
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      query_name: dynamodb.ap-southeast-2.amazonaws.com
+      query_type: A
+      validate_answer_rrs:
+        fail_if_none_matches_regexp: ['\tIN\tA\t']
+
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+
+  # 1472 bytes of payload makes a 1500-byte packet. Linux sets don't fragment
+  # on unprivileged ping sockets, so a hop with a smaller MTU that drops it
+  # without saying so shows as loss here while small pings get through.
+  # (dont_fragment would need a raw socket.)
+  icmp_1500:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      payload_size: 1472
+
+  # Targets are picked to answer directly, so a redirect is a pass rather than
+  # a second fetch from somewhere else.
+  https:
+    prober: http
+    timeout: 10s
+    http:
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      fail_if_not_ssl: true
+      follow_redirects: false
+      valid_status_codes: [200, 204, 301]
+
+  # 32 KiB is enough full-size segments to hit an MTU black hole. The limit
+  # fails the probe rather than fetching 100 MB if a server ignores the range.
+  download:
+    prober: http
+    timeout: 15s
+    http:
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      fail_if_not_ssl: true
+      headers:
+        Range: bytes=0-32767
+      valid_status_codes: [200, 206]
+      body_size_limit: 64KiB
+
+  # QUIC runs over UDP 443, so it fails where UDP is dropped and TCP isn't.
+  # Browsers then fall back to TCP after a stall.
+  http3:
+    prober: http
+    timeout: 10s
+    http:
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      enable_http3: true
+      enable_http2: false
+      valid_http_versions: [HTTP/3.0]

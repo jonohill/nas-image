@@ -11,6 +11,7 @@ const SECTIONS = [
             { name: "EdgeRouter", icon: "edgerouter.svg", path: "/grafana/d/edgerouter" },
             { name: "Backups", icon: "backups.svg", path: "/grafana/d/backups" },
             { name: "Server", icon: "server.svg", path: "/grafana/d/server" },
+            { name: "Internet probes", icon: "probes.svg", path: "/grafana/d/probes" },
         ],
     },
 ];

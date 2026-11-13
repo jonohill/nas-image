@@ -69,6 +69,8 @@ scrape_configs:
           - cf-images.ap-southeast-2.prod.boltdns.net:443
           - a.slack-edge.com:443
         labels: {module: tcp_connect, hop: internet}
+      - targets: [outlook.com:443]
+        labels: {module: tcp_connect, hop: internet}
       # ecosia.com is AWS Frankfurt and redirects to www.ecosia.org on Cloudflare
       - targets: [ecosia.com:443]
         labels: {module: tcp_connect, hop: overseas}

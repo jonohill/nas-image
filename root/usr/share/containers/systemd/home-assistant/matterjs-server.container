@@ -8,7 +8,7 @@ Wants=network-online.target
 StartLimitIntervalSec=0
 
 [Container]
-Image=ghcr.io/matter-js/matterjs-server:1.5.5
+Image=ghcr.io/matter-js/matterjs-server:1.6.0
 GlobalArgs=--storage-opt=additionalimagestore=/usr/lib/bootc/storage
 # Image is logically bound, so bootc keeps it in the additional store above
 Pull=never

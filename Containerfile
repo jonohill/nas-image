@@ -96,7 +96,7 @@ RUN --mount=type=secret,id=mok_key,required=true \
 
 # Backups, see docs/backup-plan.md. Neither tool is packaged for EL10.
 # renovate: datasource=github-releases depName=rustic-rs/rustic extractVersion=^v(?<version>.*)$
-ARG RUSTIC_VERSION=0.11.4
+ARG RUSTIC_VERSION=0.12.0
 # rclone reads every RCLONE_* environment variable as a flag, so the ARG
 # must not be named RCLONE_VERSION.
 # renovate: datasource=github-releases depName=rclone/rclone extractVersion=^v(?<version>.*)$
